@@ -38,10 +38,6 @@ def submit_review(card_id):
     score = semantic_similarity(user_answer, card.answer)
     note = data.get("note")
 
-    # Update card review tracking
-    card.review_count += 1
-    card.last_reviewed = datetime.utcnow()
-
     # Calculate next review date or mark as fully reviewed
     if card.review_count >= ReviewService.REQUIRED_REVIEWS:
         card.is_fully_reviewed = True
@@ -49,9 +45,14 @@ def submit_review(card_id):
     else:
         card.next_review_at = ReviewService.calculate_next_review_date(card)
 
+    # Add the review event to the database
     review = Review(
         card_id=card_id, reviewed_at=datetime.utcnow(), score=float(score), note=note
     )
+
+    # Update card review tracking
+    card.review_count += 1
+    card.last_reviewed = datetime.utcnow()
 
     db.session.add(review)
     db.session.commit()
@@ -120,8 +121,7 @@ def add_optional_review(card_id):
             {
                 "message": "Optional review recorded successfully",
                 "review_stage": "Optional Review",
-                "total_reviews": card.review_count
-                + len([r for r in card.reviews]),  # Include optional reviews
+                "total_reviews": card.review_count,
             }
         ),
         201,

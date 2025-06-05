@@ -8,15 +8,18 @@ class ReviewService:
 
     @staticmethod
     def calculate_next_review_date(card) -> Optional[datetime]:
-        # If a card is fully reviewed (meaning the user has reviewed it at least 3 times)
+        # The card is fully reviewed
         if card.review_count >= ReviewService.REQUIRED_REVIEWS:
             return None
 
-        # Get the interval from the current review count
+        if card.review_count >= len(ReviewService.INTERVALS):
+            return None
+
         interval_days = ReviewService.INTERVALS[card.review_count]
 
-        # Calculate from card creation date for consistency
-        return card.created_at + timedelta(days=interval_days)
+        # Calculate spaced repetition from the current time or last reviewed
+        base_date = card.last_reviewed or datetime.utcnow()
+        return base_date + timedelta(days=interval_days)
 
     @staticmethod
     def get_review_stage(review_count: int) -> str:

@@ -1,6 +1,8 @@
 from flask import Flask, jsonify, request, Blueprint
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import db, Folder, Deck
+from sqlalchemy.exc import IntegrityError
+
 
 deck_bp = Blueprint("deck", __name__)
 
