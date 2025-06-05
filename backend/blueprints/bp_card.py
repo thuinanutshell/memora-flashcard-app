@@ -26,11 +26,7 @@ def add_card(deck_id):
     difficulty_level = data.get("difficulty_level")
 
     # If the card is created for the first time, next review should be in the next 24 hours
-    next_review_at = (
-        ReviewService.calculate_next_review_date(card)
-        if card.review_count > 0
-        else datetime.utcnow() + timedelta(days=1)
-    )
+    next_review_at = datetime.utcnow() + timedelta(days=1)
     review_count = data.get("review_count", 0)
 
     if not question or not answer or not difficulty_level:
@@ -97,8 +93,7 @@ def get_card(card_id):
         "review_count": card.review_count,
     }
 
-    return jsonify({"message": f"Card {card.id} is retrieved",
-                    "card": card_data}), 200
+    return jsonify({"message": f"Card {card.id} is retrieved", "card": card_data}), 200
 
 
 # Update a card's information partially

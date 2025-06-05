@@ -3,6 +3,7 @@ from sqlalchemy import or_
 from flask_jwt_extended import (
     create_access_token,
     get_jwt,
+    get_jwt_identity,
     jwt_required,
     JWTManager,
 )
@@ -36,7 +37,20 @@ def register():
     )
     db.session.add(new_user)
     db.session.commit()
-    return jsonify({"message": f"New user created {new_user.username}"}), 201
+    return (
+        jsonify(
+            {
+                "message": "New user created",
+                "user": {
+                    "id": new_user.id,
+                    "full_name": new_user.full_name,
+                    "username": new_user.username,
+                    "email": new_user.email,
+                },
+            }
+        ),
+        201,
+    )
 
 
 @auth_bp.route("/login", methods=["POST"])
