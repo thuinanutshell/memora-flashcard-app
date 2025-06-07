@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 from flask import Flask
 from flask_migrate import Migrate
+from flask_cors import CORS, cross_origin
 from backend.models import db
 from backend.blueprints.bp_auth import auth_bp, jwt
 from backend.blueprints.bp_folder import folder_bp
@@ -15,6 +16,10 @@ load_dotenv()
 app = Flask(__name__)
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")
 app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("SQLALCHEMY_DATABASE_URI")
+
+# Set up CORS
+CORS(app, resources={r"/*": {"origins": "http://localhost:5173"}})
+
 db.init_app(app)
 jwt.init_app(app)
 migrate = Migrate(app, db)
