@@ -1,7 +1,7 @@
 from flask import Flask, Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import db, User, Folder, Deck, Card, Review
-from services.review_service import ReviewService
+from backend.models import db, User, Folder, Deck, Card, Review
+from backend.services.review_service import ReviewService
 from datetime import datetime, timedelta
 from sentence_transformers import SentenceTransformer, util
 
@@ -9,19 +9,24 @@ review_bp = Blueprint("review", __name__)
 
 
 def semantic_similarity(user_answer, correct_answer):
+    """Logic to compute the accuracy score of user answer vs. the correct answer of the card"""
     model = SentenceTransformer("all-MiniLM-L6-v2")
     embeddings = model.encode([user_answer.strip(), correct_answer.strip()])
     similarity = util.cos_sim(embeddings[0], embeddings[1])
     return float(similarity) * 100
 
 
-# Add a review event for a card to the database
 @review_bp.route("/<int:card_id>", methods=["POST"])
 @jwt_required()
 def submit_review(card_id):
+    """Logic to add a new review event for a card
+
+    - First, the card is verified the ownership by joining the Deck and Folder tables
+    - Then, we get the user answer from the client side
+    - Then, compute the accuracy score for the user's input
+    """
     current_user_id = get_jwt_identity()
 
-    # Verify card ownership
     card = (
         Card.query.join(Deck)
         .join(Folder)
@@ -34,25 +39,34 @@ def submit_review(card_id):
     data = request.get_json()
     user_answer = data.get("answer")
 
+    # Validate that user_answer is provided
+    if user_answer is None:
+        return jsonify({"error": "Answer is required"}), 400
+
     # Compute the score of user's input
     score = semantic_similarity(user_answer, card.answer)
     note = data.get("note")
 
-    # Calculate next review date or mark as fully reviewed
-    if card.review_count >= ReviewService.REQUIRED_REVIEWS:
-        card.is_fully_reviewed = True
-        card.next_review_at = None  # no more scheduled reviews are needed
-    else:
-        card.next_review_at = ReviewService.calculate_next_review_date(card)
-
     # Add the review event to the database
     review = Review(
-        card_id=card_id, reviewed_at=datetime.utcnow(), score=float(score), note=note
+        card_id=card_id,
+        user_answer=user_answer,
+        reviewed_at=datetime.utcnow(),
+        score=float(score),
+        note=note,
     )
 
-    # Update card review tracking
+    # Update card review tracking by incrementing review count by 1 and update the last review date
     card.review_count += 1
     card.last_reviewed = datetime.utcnow()
+
+    # Calculate next review date or mark as fully reviewed
+    # Check AFTER incrementing the review count
+    if card.review_count >= ReviewService.REQUIRED_REVIEWS:
+        card.is_fully_reviewed = True
+        card.next_review_at = None
+    else:
+        card.next_review_at = ReviewService.calculate_next_review_date(card)
 
     db.session.add(review)
     db.session.commit()
@@ -71,132 +85,184 @@ def submit_review(card_id):
     return jsonify(response_data), 201
 
 
-@review_bp.route("/optional/<int:card_id>", methods=["POST"])
+@review_bp.route("/dashboard", methods=["GET"])
 @jwt_required()
-def add_optional_review(card_id):
-    """For reviewing fully reviewed cards (optional reviews)"""
+def get_dashboard_stats():
+    """Logic to get the total number of cards due in 3 different intervals across folders"""
     current_user_id = get_jwt_identity()
 
-    # Verify card ownership
-    card = (
+    today = datetime.utcnow().date()
+    week_later = today + timedelta(days=7)
+    month_later = today + timedelta(days=30)
+
+    # Query all cards for the current user that have not been reviewed fully
+    base_query = (
         Card.query.join(Deck)
         .join(Folder)
-        .filter(Card.id == card_id, Folder.user_id == current_user_id)
-        .first()
+        .filter(Folder.user_id == current_user_id, Card.is_fully_reviewed == False)
     )
 
-    if not card:
-        return jsonify({"error": "Card not found"}), 404
+    # Cards due today
+    cards_today = base_query.filter(Card.next_review_at <= today).count()
 
-    if not card.is_fully_reviewed:
-        return (
-            jsonify(
-                {
-                    "error": "Card is not fully reviewed yet. Use regular review endpoint."
-                }
-            ),
-            400,
-        )
+    # Cards due in 7 days
+    cards_week = base_query.filter(
+        Card.next_review_at > today, Card.next_review_at <= week_later
+    ).count()
 
-    data = request.get_json()
-    score = data.get("score")
-    note = data.get("note")
-
-    if score is None or not (0 <= score <= 100):
-        return jsonify({"error": "Score must be a percentage between 0 and 100"}), 400
-
-    # Update last reviewed time only (don't change review_count or next_review_at)
-    card.last_reviewed = datetime.utcnow()
-
-    # Create review record
-    review = Review(
-        card_id=card_id, reviewed_at=datetime.utcnow(), score=float(score), note=note
-    )
-
-    db.session.add(review)
-    db.session.commit()
+    # Cards due in 30 days
+    cards_month = base_query.filter(
+        Card.next_review_at > week_later, Card.next_review_at <= month_later
+    ).count()
 
     return (
         jsonify(
             {
-                "message": "Optional review recorded successfully",
-                "review_stage": "Optional Review",
-                "total_reviews": card.review_count,
+                "cards_due_today": cards_today,
+                "cards_due_this_week": cards_week,
+                "cards_due_this_month": cards_month,
             }
         ),
-        201,
+        200,
     )
 
 
-@review_bp.route("/dashboard", methods=["GET"])
+@review_bp.route("/stats/general", methods=["GET"])
 @jwt_required()
-def get_dashboard_stats():
+def get_general_stats():
+    """Logic to get the general statistics across folders"""
     current_user_id = get_jwt_identity()
 
-    # Cards due for review (not fully reviewed and past due date)
-    cards_due = ReviewService.get_cards_due_for_review(current_user_id)
+    folders = Folder.query.filter_by(user_id=current_user_id).all()
 
-    # Cards by review stage
-    new_cards = (
-        Card.query.join(Deck)
+    # Get all reviews for a specific folder
+    all_reviews = (
+        Review.query.join(Card)
+        .join(Deck)
         .join(Folder)
-        .filter(Folder.user_id == current_user_id, Card.review_count == 0)
-        .count()
+        .filter(Folder.user_id == current_user_id)
+        .order_by(Review.reviewed_at.asc())
+        .all()
     )
 
-    first_review_cards = (
-        Card.query.join(Deck)
-        .join(Folder)
-        .filter(Folder.user_id == current_user_id, Card.review_count == 1)
-        .count()
+    # Compute the overal average accuracy score for the folder
+    avg_score = (
+        sum(r.score for r in all_reviews) / len(all_reviews) if all_reviews else 0
     )
 
-    second_review_cards = (
-        Card.query.join(Deck)
-        .join(Folder)
-        .filter(Folder.user_id == current_user_id, Card.review_count == 2)
-        .count()
-    )
-
-    fully_reviewed_cards = (
+    # Compute the total number of cards fully reviewed for a specific folder
+    total_fully_reviewed = (
         Card.query.join(Deck)
         .join(Folder)
         .filter(Folder.user_id == current_user_id, Card.is_fully_reviewed == True)
         .count()
     )
 
-    # Recent performance (last 30 days)
-    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-    recent_reviews = (
-        Review.query.join(Card)
-        .join(Deck)
-        .join(Folder)
-        .filter(
-            Folder.user_id == current_user_id, Review.reviewed_at >= thirty_days_ago
+    # Score history per folder
+    accuracy_by_folder = {}
+    for folder in folders:
+        reviews = (
+            Review.query.join(Card)
+            .join(Deck)
+            .filter(Deck.folder_id == folder.id)
+            .order_by(
+                Review.reviewed_at.asc()
+            )  # order by reviewed time from earliest to latest
+            .all()
         )
-        .all()
-    )
 
-    avg_score = (
-        sum(r.score for r in recent_reviews) / len(recent_reviews)
-        if recent_reviews
-        else 0
-    )
+        # Get the accuracy score at all timestampes for each folder
+        accuracy_by_folder[folder.name] = [
+            {"timestamp": r.reviewed_at.isoformat(), "score": round(r.score, 1)}
+            for r in reviews
+        ]
+
+    # Study streak (consecutive days)
+    # First sort all the review dates from latest to earliest
+    reviewed_dates = sorted({r.reviewed_at.date() for r in all_reviews}, reverse=True)
+    streak = 0
+    today = datetime.utcnow().date()
+    for i, d in enumerate(reviewed_dates):
+        if (today - timedelta(days=i)) == d:
+            streak += 1
+        else:
+            break
 
     return (
         jsonify(
             {
-                "cards_due_today": len(cards_due),
-                "cards_by_stage": {
-                    "new": new_cards,
-                    "first_review": first_review_cards,
-                    "second_review": second_review_cards,
-                    "fully_reviewed": fully_reviewed_cards,
-                },
-                "recent_performance": {
-                    "average_score": round(avg_score, 1),
-                    "total_reviews": len(recent_reviews),
-                },
+                "average_score": round(avg_score, 1),
+                "fully_reviewed_cards": total_fully_reviewed,
+                "study_streak": streak,
+                "accuracy_graph": accuracy_by_folder,
+            }
+        ),
+        200,
+    )
+
+
+@review_bp.route("/stats/folder/<int:folder_id>", methods=["GET"])
+@jwt_required()
+def get_folder_stats(folder_id):
+    current_user_id = get_jwt_identity()
+    folder = Folder.query.filter_by(id=folder_id, user_id=current_user_id).first()
+
+    if not folder:
+        return jsonify({"error": "Folder not found"}), 404
+
+    decks = folder.decks
+
+    all_reviews = (
+        Review.query.join(Card)
+        .join(Deck)
+        .filter(Deck.folder_id == folder.id)
+        .order_by(Review.reviewed_at.asc())
+        .all()
+    )
+
+    # Score history of accuracy score per deck
+    accuracy_by_deck = {}
+    for deck in decks:
+        reviews = (
+            Review.query.join(Card)
+            .filter(Card.deck_id == deck.id)
+            .order_by(Review.reviewed_at.asc())
+            .all()
+        )
+        accuracy_by_deck[deck.name] = [
+            {"timestamp": r.reviewed_at.isoformat(), "score": round(r.score, 1)}
+            for r in reviews
+        ]
+
+    # Average score for a deck
+    avg_score = (
+        sum(r.score for r in all_reviews) / len(all_reviews) if all_reviews else 0
+    )
+
+    # Total number of cards fully reviewed for a deck
+    total_fully_reviewed = (
+        Card.query.join(Deck)
+        .filter(Deck.folder_id == folder.id, Card.is_fully_reviewed == True)
+        .count()
+    )
+
+    reviewed_dates = sorted({r.reviewed_at.date() for r in all_reviews}, reverse=True)
+    streak = 0
+    today = datetime.utcnow().date()
+    for i, d in enumerate(reviewed_dates):
+        if (today - timedelta(days=i)) == d:
+            streak += 1
+        else:
+            break
+
+    return (
+        jsonify(
+            {
+                "folder_name": folder.name,
+                "average_score": round(avg_score, 1),
+                "fully_reviewed_cards": total_fully_reviewed,
+                "study_streak": streak,
+                "accuracy_graph": accuracy_by_deck,
             }
         ),
         200,
@@ -206,10 +272,7 @@ def get_dashboard_stats():
 @review_bp.route("/stats/deck/<int:deck_id>", methods=["GET"])
 @jwt_required()
 def get_deck_stats(deck_id):
-    """Get statistics for a specific deck"""
     current_user_id = get_jwt_identity()
-
-    # Verify deck ownership
     deck = (
         Deck.query.join(Folder)
         .filter(Deck.id == deck_id, Folder.user_id == current_user_id)
@@ -219,42 +282,47 @@ def get_deck_stats(deck_id):
     if not deck:
         return jsonify({"error": "Deck not found"}), 404
 
-    # Get cards by review stage for this deck
-    cards_by_stage = {}
-    for stage in range(4):  # 0, 1, 2, 3+
-        if stage < 3:
-            count = Card.query.filter_by(deck_id=deck_id, review_count=stage).count()
-            stage_name = ReviewService.get_review_stage(stage)
-        else:
-            count = Card.query.filter_by(
-                deck_id=deck_id, is_fully_reviewed=True
-            ).count()
-            stage_name = "Fully Reviewed"
+    all_reviews = (
+        Review.query.join(Card)
+        .filter(Card.deck_id == deck.id)
+        .order_by(Review.reviewed_at.asc())
+        .all()
+    )
 
-        cards_by_stage[stage_name.lower().replace(" ", "_")] = count
-
-    # Cards due in this deck
-    cards_due = [
-        card
-        for card in ReviewService.get_cards_due_for_review(current_user_id)
-        if card.deck_id == deck_id
+    # Score history for this deck
+    accuracy_graph = [
+        {"timestamp": r.reviewed_at.isoformat(), "score": round(r.score, 1)}
+        for r in all_reviews
     ]
 
-    # Average score for this deck
-    deck_reviews = Review.query.join(Card).filter(Card.deck_id == deck_id).all()
-
+    # Average score
     avg_score = (
-        sum(r.score for r in deck_reviews) / len(deck_reviews) if deck_reviews else 0
+        sum(r.score for r in all_reviews) / len(all_reviews) if all_reviews else 0
     )
+
+    # Fully reviewed cards in this deck
+    total_fully_reviewed = Card.query.filter_by(
+        deck_id=deck.id, is_fully_reviewed=True
+    ).count()
+
+    # Study streak
+    reviewed_dates = sorted({r.reviewed_at.date() for r in all_reviews}, reverse=True)
+    streak = 0
+    today = datetime.utcnow().date()
+    for i, d in enumerate(reviewed_dates):
+        if (today - timedelta(days=i)) == d:
+            streak += 1
+        else:
+            break
 
     return (
         jsonify(
             {
                 "deck_name": deck.name,
-                "cards_due": len(cards_due),
-                "cards_by_stage": cards_by_stage,
                 "average_score": round(avg_score, 1),
-                "total_reviews": len(deck_reviews),
+                "fully_reviewed_cards": total_fully_reviewed,
+                "study_streak": streak,
+                "accuracy_graph": accuracy_graph,
             }
         ),
         200,

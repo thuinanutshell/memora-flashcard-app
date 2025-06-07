@@ -8,16 +8,26 @@ from flask_jwt_extended import (
     JWTManager,
 )
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import db, User
+from backend.models import db, User
 
+# Initialize JSON Web Token Manager
 jwt = JWTManager()
+
+# Set up a blacklisted tokens to log out user
 blacklisted_tokens = set()
 auth_bp = Blueprint("auth", __name__)
 
 
 @auth_bp.route("/register", methods=["POST"])
 def register():
-    # Get all data from the JSON object
+    """Logic to create a new user
+
+    JSON Object Data:
+        - full_name (str)
+        - username (str)
+        - email (str)
+        - password (str)
+    """
     data = request.get_json()
     full_name = data.get("full_name")
     username = data.get("username")
@@ -55,20 +65,29 @@ def register():
 
 @auth_bp.route("/login", methods=["POST"])
 def login():
-    # Get all data from the JSON object
+    """Logic to log in a user
+
+    JSON Object Data:
+        - login (str): can either be email or username
+        - password (str): user's plain string password
+    """
     data = request.get_json()
-    login = data.get("login")  # can be either username or email
+    login = data.get("login")
     password = data.get("password")
 
     # Check if the user already exists in the database
     user = User.query.filter(or_(User.username == login, User.email == login)).first()
 
+    # Check if the password input matches that in the database
     if user and check_password_hash(user.password_hash, password):
+        # Create an access token based on user's id
         access_token = create_access_token(identity=user.id)
         return (
             jsonify(
                 {
-                    "message": f"User {user.username} logged in with access token {access_token}"
+                    "message": "Login successful",
+                    "access_token": access_token,
+                    "user_id": user.id,
                 }
             ),
             200,
@@ -82,7 +101,7 @@ def login():
 def logout():
     jti = get_jwt()["jti"]  # JWT unique identifier
     blacklisted_tokens.add(jti)
-    return jsonify({"message": "Access token revoked"})
+    return jsonify({"message": f"Access token revoked for user {jti}"}), 200
 
 
 @auth_bp.route("/protected", methods=["GET"])

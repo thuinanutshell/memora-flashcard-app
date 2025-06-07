@@ -2,12 +2,12 @@ import os
 from dotenv import load_dotenv
 from flask import Flask
 from flask_migrate import Migrate
-from models import db
-from blueprints.bp_auth import auth_bp, jwt
-from blueprints.bp_folder import folder_bp
-from blueprints.bp_card import card_bp
-from blueprints.bp_deck import deck_bp
-from blueprints.bp_review import review_bp
+from backend.models import db
+from backend.blueprints.bp_auth import auth_bp, jwt
+from backend.blueprints.bp_folder import folder_bp
+from backend.blueprints.bp_card import card_bp
+from backend.blueprints.bp_deck import deck_bp
+from backend.blueprints.bp_review import review_bp
 
 
 load_dotenv()

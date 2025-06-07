@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, request, Blueprint
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import db, Folder, Deck
+from backend.models import db, Folder, Deck
 from sqlalchemy.exc import IntegrityError
 
 
@@ -46,6 +46,7 @@ def add_deck(folder_id):
 @deck_bp.route("/<int:deck_id>", methods=["GET"])
 @jwt_required()
 def get_one_deck(deck_id):
+    # Verify ownership of the deck
     current_user_id = get_jwt_identity()
     deck = (
         Deck.query.join(Folder)
@@ -61,6 +62,10 @@ def get_one_deck(deck_id):
             "question": card.question,
             "answer": card.answer,
             "difficulty_level": card.difficulty_level,
+            "next_review_at": card.next_review_at,
+            "review_count": card.review_count,
+            "is_fully_reviewed": card.is_fully_reviewed,
+            "last_reviewed": card.last_reviewed,
         }
         for card in deck.cards
     ]
@@ -104,14 +109,19 @@ def update_deck(deck_id):
 @jwt_required()
 def delete_deck(deck_id):
     current_user_id = get_jwt_identity()
-    deck = (
-        Deck.query.join(Folder)
-        .filter(Deck.id == deck_id, Folder.user_id == current_user_id)
-        .first()
-    )
-    if not deck:
-        return jsonify({"error": "Deck not found"}), 404
+    try:
+        deck = (
+            Deck.query.join(Folder)
+            .filter(Deck.id == deck_id, Folder.user_id == current_user_id)
+            .first()
+        )
+        if not deck:
+            return jsonify({"error": "Deck not found"}), 404
 
-    db.session.delete(deck)
-    db.session.commit()
-    return jsonify({"message": f"Deleted deck {deck.id}"}), 200
+        db.session.delete(deck)
+        db.session.commit()
+        return jsonify({"message": f"Deleted deck {deck.id}"}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "An unexpected error occurred", "details": str(e)}), 500 
