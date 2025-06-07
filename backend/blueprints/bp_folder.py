@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import db, User, Folder, Deck
+from backend.models import db, User, Folder, Deck
+from sqlalchemy.exc import IntegrityError
 
 folder_bp = Blueprint("folder", __name__)
 
@@ -8,7 +9,13 @@ folder_bp = Blueprint("folder", __name__)
 @folder_bp.route("/", methods=["POST"])
 @jwt_required()
 def add_folder():
-    """Logic to add a new folder to the database"""
+    """Logic to add a new folder to the database
+
+    JSON Object data:
+        - name (string)
+        - description (string)
+        - current_user_id (string): check the ID of the current user
+    """
     data = request.get_json()
     name = data.get("name")
     description = data.get("description")
@@ -38,7 +45,7 @@ def add_folder():
             ),
             409,
         )
-    return jsonify({"message": f"New folder {folder.name} added"}), 201
+    return jsonify({"message": f"New folder {folder.name} added", "id": folder.id}), 201
 
 
 @folder_bp.route("/", methods=["GET"])
@@ -111,7 +118,14 @@ def update_folder(folder_id):
         db.session.rollback()
         return jsonify({"error": "Folder name already exists"}), 409
 
-    return jsonify({"message": f"Updated folder {folder.id}"}), 200
+    return (
+        jsonify(
+            {
+                "message": f"Updated folder {folder.id} with {folder.name} and {folder.description}"
+            }
+        ),
+        200,
+    )
 
 
 # Delete a folder

@@ -22,11 +22,14 @@ class Base:
     """Define the Base model that is inherited by all other models.
 
     Attributes:
-        - Datetimes are calculated from the server side using func.now()
+        - Column definitions that define the structure of the table (descriptors)
+            Datetimes are calculated from the server side using func.now()
             created_at: the date and time that an object is created
             deleted_at: the date and time that an object is deleted
             updated_at: the date and time that an object is updated
-        - Table name are all lowercase across tables
+        - Class-level attribute:
+            Table name are all lowercase across tables (because the table names
+            are the property unique to each subclass, not shared as a single instance)
     """
 
     created_at: Mapped[datetime.datetime] = mapped_column(
@@ -51,7 +54,7 @@ class User(db.Model):
     """Table to store user's personal information
 
     Attributes:
-        - id (integer)
+        - id (UUID string)
         - full_name (string)
         - username (string)
         - email (string)
@@ -73,7 +76,7 @@ class User(db.Model):
     )
 
     def __repr__(self):
-        return f"<User {self.username}>"
+        return f"<User ID {self.id} full name {self.full_name} username {self.username} email {self.email}>"
 
 
 class Folder(db.Model):
@@ -102,6 +105,9 @@ class Folder(db.Model):
     decks: Mapped[List["Deck"]] = relationship(
         back_populates="folder", cascade="all, delete-orphan"
     )
+
+    def __repr__(self):
+        return f"<Folder id={self.id} name={self.name!r} user_id={self.user_id}>"
 
 
 class Deck(db.Model):
@@ -132,6 +138,9 @@ class Deck(db.Model):
         back_populates="deck", cascade="all, delete-orphan"
     )
 
+    def __repr__(self):
+        return f"<Deck id={self.id} name={self.name!r} folder_id={self.folder_id}>"
+
 
 class Card(db.Model):
     """Table to store cards belong to each folder
@@ -140,8 +149,11 @@ class Card(db.Model):
         - id (integer)
         - question (text)
         - answer (text)
-        - reviewed_at: first, second, last
-        - scores (list): a list of scores for each review
+        - difficulty_level (string)
+        - next_review_at (datetime): This attribute will be updated based on when the user reviews the card
+        - review_count (integer): Default value is 0 when first created and will be updated each time the user reviews the card
+        - is_fully_reviewed (boolean): Default value is False when first created and will be updated to True when the card is reviewed at least 3 times
+        - last_reviewed (datetime): Each time the card is reviewed, this column will be updated and used to calculate the next due date to review the card
         - deck_id (int): foreign key that refers to the Folder model (many-to-one)
         - deck (string): relationship with the Folder model
     """
@@ -150,10 +162,13 @@ class Card(db.Model):
         UniqueConstraint("deck_id", "question", name="uix_deck_card_question"),
     )
 
+    # Input created by the user
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     question: Mapped[str] = mapped_column(Text, nullable=False)
     answer: Mapped[str] = mapped_column(Text, nullable=False)
     difficulty_level: Mapped[str] = mapped_column(String, nullable=False)
+
+    # Input that will be updated by the server
     next_review_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -176,9 +191,25 @@ class Card(db.Model):
         "Review", back_populates="card", cascade="all, delete-orphan"
     )
 
+    def __repr__(self):
+        return f"<Card id={self.id} question={self.question} deck_id={self.deck_id}>"
+
 
 class Review(db.Model):
+    """Table to store review events that belong to each card
+
+    Attributes:
+        - id (integer)
+        - user_answer (text): user's answer when they review the card
+        - reviewed_at (datetime): the date and time at which the user reviews the card
+        - score (float): the accuracy percentage of user's answer and the correct answer
+        - note (text): the note that the user stores after reviewing the card
+        - card_id (integer): foreign key that refers to the card table
+        - card (List): many-to-one relationship with the Card model
+    """
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_answer: Mapped[str] = mapped_column(Text, nullable=False)
     reviewed_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -188,3 +219,6 @@ class Review(db.Model):
     # Many-to-one relationship with the Card model
     card_id: Mapped[int] = mapped_column(Integer, ForeignKey("card.id"), nullable=False)
     card: Mapped["Card"] = relationship(back_populates="reviews")
+
+    def __repr__(self):
+        return f"<Review id={self.id} score={self.score} card_id={self.card_id}>"
