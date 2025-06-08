@@ -10,10 +10,25 @@ review_bp = Blueprint("review", __name__)
 
 def semantic_similarity(user_answer, correct_answer):
     """Logic to compute the accuracy score of user answer vs. the correct answer of the card"""
+    # Debug prints to see what we're comparing
+    print(f"User answer: '{user_answer.strip()}'")
+    print(f"Correct answer: '{correct_answer.strip()}'")
+
     model = SentenceTransformer("all-MiniLM-L6-v2")
     embeddings = model.encode([user_answer.strip(), correct_answer.strip()])
-    similarity = util.cos_sim(embeddings[0], embeddings[1])
-    return float(similarity) * 100
+    similarity_tensor = util.cos_sim(embeddings[0], embeddings[1])
+
+    # Extract the actual similarity value from the tensor
+    similarity_score = similarity_tensor.item()  # Use .item() to get the scalar value
+
+    # Debug print to see the similarity score
+    print(f"Similarity score: {similarity_score}")
+
+    # Convert to percentage
+    percentage = similarity_score * 100
+    print(f"Percentage: {percentage}")
+
+    return percentage
 
 
 @review_bp.route("/<int:card_id>", methods=["POST"])
@@ -73,6 +88,7 @@ def submit_review(card_id):
 
     response_data = {
         "message": "Review recorded successfully",
+        "score": round(float(score), 1),
         "review_stage": ReviewService.get_review_stage(card.review_count),
         "reviews_completed": card.review_count,
         "reviews_remaining": max(0, ReviewService.REQUIRED_REVIEWS - card.review_count),

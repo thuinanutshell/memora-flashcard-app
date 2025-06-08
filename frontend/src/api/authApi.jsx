@@ -8,6 +8,12 @@ export const register = async (userData) => {
         },
         body: JSON.stringify(userData)
     });
+    
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Registration failed');
+    }
+    
     return await response.json();
 };
 
@@ -36,7 +42,10 @@ export const logout = async (token) => {
             'Authorization': `Bearer ${token}`
         }
     });
-    return await response.json();
+    
+    if (!response.ok) {
+        throw new Error('Logout failed');
+    }
 };
 
 export const verifyToken = async (token) => {
@@ -46,5 +55,10 @@ export const verifyToken = async (token) => {
             'Authorization': `Bearer ${token}`
         }
     });
+    
+    if (!response.ok) {
+        throw new Error('Token verification failed');
+    }
+    
     return await response.json();
 };

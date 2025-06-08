@@ -10,6 +10,7 @@ deck_bp = Blueprint("deck", __name__)
 @deck_bp.route("/<int:folder_id>", methods=["POST"])
 @jwt_required()
 def add_deck(folder_id):
+    """Create a new deck for a specific folder"""
     current_user_id = get_jwt_identity()
     data = request.get_json()
 
@@ -56,6 +57,7 @@ def add_deck(folder_id):
                         "name": deck.name,
                         "description": deck.description,
                         "folder_id": deck.folder_id,
+                        "cardCount": len(deck.cards),
                     },
                 }
             ),
@@ -67,41 +69,10 @@ def add_deck(folder_id):
         return jsonify({"error": "Database error occurred"}), 500
 
 
-@deck_bp.route("/folder/<int:folder_id>", methods=["GET"])
-@jwt_required()
-def get_all_decks(folder_id):
-    current_user_id = get_jwt_identity()
-
-    # Verify folder belongs to user
-    folder = Folder.query.filter_by(id=folder_id, user_id=current_user_id).first()
-    if not folder:
-        return jsonify({"error": "Folder not found"}), 404
-
-    decks = Deck.query.filter_by(folder_id=folder_id).all()
-
-    return (
-        jsonify(
-            {
-                "decks": [
-                    {
-                        "id": deck.id,
-                        "name": deck.name,
-                        "description": deck.description,
-                        "card_count": len(deck.cards),
-                        "created_at": deck.created_at.isoformat(),
-                        "updated_at": deck.updated_at.isoformat(),
-                    }
-                    for deck in decks
-                ]
-            }
-        ),
-        200,
-    )
-
-
 @deck_bp.route("/<int:deck_id>", methods=["GET"])
 @jwt_required()
 def get_one_deck(deck_id):
+    """Retrieve all cards for a specific deck"""
     current_user_id = get_jwt_identity()
 
     deck = (
@@ -197,6 +168,7 @@ def update_deck(deck_id):
                         "id": deck.id,
                         "name": deck.name,
                         "description": deck.description,
+                        "cardCount": len(deck.cards),
                     },
                 }
             ),

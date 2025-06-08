@@ -1,7 +1,8 @@
-import { fetchWithAuth } from '../api/http';
+import { fetchWithAuth } from '../api/api';
 
 const BASE_URL = "http://127.0.0.1:5001/deck";
 
+// Create a deck in a specific folder
 export const createDeck = async (token, folderId, deckData) => {
     const response = await fetchWithAuth(`${BASE_URL}/${folderId}`, {
         method: 'POST',
@@ -16,8 +17,9 @@ export const createDeck = async (token, folderId, deckData) => {
     return await response.json();
 };
 
-export const getAllDecks = async (token, folderId) => {
-    const response = await fetchWithAuth(`${BASE_URL}/folder/${folderId}`, {
+// Get all decks
+export const getDecks = async (token) => {
+    const response = await fetchWithAuth(`${BASE_URL}`, {
         method: 'GET'
     }, token);
     
@@ -29,7 +31,8 @@ export const getAllDecks = async (token, folderId) => {
     return await response.json();
 };
 
-export const getOneDeck = async (token, deckId) => {
+// Get a single deck by ID
+export const getOneDeckWithCards = async (token, deckId) => {
     const response = await fetchWithAuth(`${BASE_URL}/${deckId}`, {
         method: 'GET'
     }, token);
@@ -42,10 +45,11 @@ export const getOneDeck = async (token, deckId) => {
     return await response.json();
 };
 
-export const updateDeck = async (token, deckId, updateData) => {
+// Update a deck
+export const updateDeck = async (token, deckId, deckData) => {
     const response = await fetchWithAuth(`${BASE_URL}/${deckId}`, {
         method: 'PATCH',
-        body: JSON.stringify(updateData)
+        body: JSON.stringify(deckData)
     }, token);
     
     if (!response.ok) {
@@ -56,6 +60,7 @@ export const updateDeck = async (token, deckId, updateData) => {
     return await response.json();
 };
 
+// Delete a deck
 export const deleteDeck = async (token, deckId) => {
     const response = await fetchWithAuth(`${BASE_URL}/${deckId}`, {
         method: 'DELETE'
