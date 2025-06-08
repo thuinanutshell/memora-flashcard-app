@@ -1,4 +1,3 @@
-// src/context/AuthContext.js
 import { createContext, useCallback, useEffect, useState } from 'react';
 import * as authApi from '../api/authApi';
 

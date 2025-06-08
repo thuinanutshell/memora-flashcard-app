@@ -18,7 +18,13 @@ app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")
 app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("SQLALCHEMY_DATABASE_URI")
 
 # Set up CORS
-CORS(app, resources={r"/*": {"origins": "http://localhost:5173"}})
+CORS(
+    app,
+    origins=["http://localhost:5173"],
+    supports_credentials=True,
+    allow_headers=["Content-Type", "Authorization"],
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+)
 
 db.init_app(app)
 jwt.init_app(app)

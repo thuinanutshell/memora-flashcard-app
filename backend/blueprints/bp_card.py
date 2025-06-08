@@ -59,13 +59,14 @@ def add_card(deck_id):
             {
                 "message": "Added a new card",
                 "card": {
-                    "card_id": card.id,
+                    "id": card.id,  # Changed from "card_id" to "id"
                     "question": card.question,
                     "answer": card.answer,
                     "difficulty_level": card.difficulty_level,
                     "next_review_at": card.next_review_at.isoformat(),
                     "review_count": card.review_count,
                     "is_fully_reviewed": card.is_fully_reviewed,
+                    "last_reviewed": None,  # Added for consistency
                 },
             }
         ),
@@ -95,10 +96,12 @@ def get_card(card_id):
         "question": card.question,
         "answer": card.answer,
         "difficulty_level": card.difficulty_level,
-        "next_review_at": card.next_review_at,
+        "next_review_at": (
+            card.next_review_at.isoformat() if card.next_review_at else None
+        ),
         "review_count": card.review_count,
         "is_fully_reviewed": card.is_fully_reviewed,
-        "last_reviewed": card.last_reviewed,
+        "last_reviewed": card.last_reviewed.isoformat() if card.last_reviewed else None,
     }
 
     return jsonify({"message": f"Card {card.id} is retrieved", "card": card_data}), 200
@@ -140,7 +143,29 @@ def update_card(card_id):
 
     db.session.commit()
 
-    return jsonify({"message": f"Updated card {card.id}"}), 200
+    # Return the updated card data for consistency
+    return (
+        jsonify(
+            {
+                "message": f"Updated card {card.id}",
+                "card": {
+                    "id": card.id,
+                    "question": card.question,
+                    "answer": card.answer,
+                    "difficulty_level": card.difficulty_level,
+                    "next_review_at": (
+                        card.next_review_at.isoformat() if card.next_review_at else None
+                    ),
+                    "review_count": card.review_count,
+                    "is_fully_reviewed": card.is_fully_reviewed,
+                    "last_reviewed": (
+                        card.last_reviewed.isoformat() if card.last_reviewed else None
+                    ),
+                },
+            }
+        ),
+        200,
+    )
 
 
 # Delete a card

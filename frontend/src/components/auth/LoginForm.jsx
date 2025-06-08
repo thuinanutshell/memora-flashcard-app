@@ -1,85 +1,74 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+// src/components/auth/LoginForm.jsx
+
+import { useEffect, useState } from 'react';
+import { Alert, Button, Form } from 'react-bootstrap';
+import { useNavigate } from 'react-router-dom';
 import useAuth from '../../hooks/useAuth';
 
-const LoginForm = () => {
-  const { login, loading, error, clearError } = useAuth();
-  const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    emailOrUsername: '',
+function LoginForm() {
+  const [credentials, setCredentials] = useState({
+    login: '',
     password: ''
   });
 
+  const { login, loading, error, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/dashboard');
+    }
+  }, [isAuthenticated, navigate]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    
-    if (error) {
-      clearError();
-    }
+    setCredentials(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!formData.emailOrUsername.trim() || !formData.password) {
-      return;
-    }
-
-    const credentials = {
-      login: formData.emailOrUsername.trim(),
-      password: formData.password
-    };
-
-    const result = await login(credentials);
-    
-    if (result.success) {
-      navigate('/folders');
-    }
+    await login(credentials);
   };
 
   return (
-    <div>
-      <h2>Login</h2>
-      
-      {error && <div>{error}</div>}
-      
-      <form onSubmit={handleSubmit}>
-        <div>
-          <label>Email or Username</label>
-          <input
-            type="text"
-            name="emailOrUsername"
-            value={formData.emailOrUsername}
-            onChange={handleChange}
-            required
-          />
-        </div>
+    <Form onSubmit={handleSubmit}>
+      <Form.Group controlId="login" className="mb-3">
+        <Form.Label>Username or Email</Form.Label>
+        <Form.Control
+          type="text"
+          name="login"
+          value={credentials.login}
+          onChange={handleChange}
+          required
+        />
+      </Form.Group>
 
-        <div>
-          <label>Password</label>
-          <input
-            type="password"
-            name="password"
-            value={formData.password}
-            onChange={handleChange}
-            required
-          />
-        </div>
+      <Form.Group controlId="password" className="mb-4">
+        <Form.Label>Password</Form.Label>
+        <Form.Control
+          type="password"
+          name="password"
+          value={credentials.password}
+          onChange={handleChange}
+          required
+        />
+      </Form.Group>
 
-        <button type="submit" disabled={loading}>
-          {loading ? 'Logging in...' : 'Login'}
-        </button>
-      </form>
+      {error && <Alert variant="danger">{error}</Alert>}
 
-      <p>
-        Don't have an account? <Link to="/register">Sign up here</Link>
-      </p>
-    </div>
+      <Button
+        type="submit"
+        variant="primary"
+        disabled={loading}
+        className="w-100"
+      >
+        {loading ? 'Logging in...' : 'Login'}
+      </Button>
+      <div className="text-center mt-3">
+        No have an account? <a href="/register" className="auth-link">Register</a>
+      </div>
+    </Form>
   );
-};
+}
 
 export default LoginForm;
