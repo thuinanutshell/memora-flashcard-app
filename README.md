@@ -9,8 +9,8 @@ https://github.com/user-attachments/assets/80f1a68c-2784-4e94-a82c-80476aa56f75
 ## Key Features
 1. Users can create folders and different study decks inside the folders
 2. Users can create flashcards inside the study deck (question, answer, and difficulty level)
-3. A spaced repetition algorithm that reminds users of the number of cards to review today, in 7 days, or in one month
-4. An analytics dashboard to show accuracy score of each folder and study deck over time.
+3. A spaced repetition algorithm is employed to remind users of the number of cards to review today, in 7 days, or in one month
+4. An analytics dashboard to show the accuracy score of each folder and study deck over time.
    
 ## Backend (Flask-Python)
 ### Database Design
