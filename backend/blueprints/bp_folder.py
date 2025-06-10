@@ -3,6 +3,14 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from backend.models import db, User, Folder, Deck, Card
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func
+from backend.utils import (
+    success_response,
+    error_response,
+    data_response,
+    validation_error,
+    not_found_error,
+    duplicate_error,
+)
 
 folder_bp = Blueprint("folder", __name__)
 
@@ -18,6 +26,10 @@ def add_folder():
         - current_user_id (string): check the ID of the current user
     """
     data = request.get_json()
+
+    if not data.get("name"):
+        return validation_error(["name"])
+
     name = data.get("name")
     description = data.get("description")
     current_user_id = get_jwt_identity()
@@ -25,12 +37,7 @@ def add_folder():
     # Check to see if the folder's name already exists for the current user
     existing_folder = Folder.query.filter_by(user_id=current_user_id, name=name).first()
     if existing_folder:
-        return (
-            jsonify(
-                {"error": "Folder name already exists. Please choose a different name"}
-            ),
-            409,
-        )
+        return duplicate_error("Folder", "name")
 
     # Add the folder to the database for current user
     folder = Folder(name=name, description=description, user_id=current_user_id)
@@ -49,21 +56,15 @@ def add_folder():
             "cardCount": 0,
         }
 
-        return (
-            jsonify(
-                {"message": f"New folder {folder.name} added", "folder": folder_data}
-            ),
-            201,
+        return success_response(
+            message="Folder created successfully",
+            data={"folder": folder_data},
+            status_code=201,
         )
 
     except IntegrityError:
         db.session.rollback()
-        return (
-            jsonify(
-                {"error": "Folder name already exists. Please choose a different name"}
-            ),
-            409,
-        )
+        return duplicate_error("Folder", "name")
 
 
 @folder_bp.route("/", methods=["GET"])
@@ -99,7 +100,7 @@ def get_folders():
         }
         folder_list.append(folder_info)
 
-    return jsonify(folder_list), 200  # Return array directly
+    return data_response(folder_list)
 
 
 # Retrieve all decks from a specific folder
@@ -110,7 +111,7 @@ def get_one_folder(folder_id):
     folder = Folder.query.filter_by(id=folder_id, user_id=current_user_id).first()
 
     if not folder:
-        return jsonify({"error": "Folder not found"}), 404
+        return not_found_error("Folder", folder_id)
 
     deck_list = [
         {
@@ -134,7 +135,8 @@ def get_one_folder(folder_id):
         "deckCount": len(deck_list),
         "cardCount": sum(len(deck.cards) for deck in folder.decks),
     }
-    return jsonify(folder_info), 200
+
+    return success_response(data={"folder": folder_info})
 
 
 # Update a folder partially: 1) change name, and 2) change description
@@ -144,7 +146,7 @@ def update_folder(folder_id):
     current_user_id = get_jwt_identity()
     folder = Folder.query.filter_by(id=folder_id, user_id=current_user_id).first()
     if not folder:
-        return jsonify({"error": "Folder not found"}), 404
+        return not_found_error("Folder", folder_id)
 
     data = request.get_json()
     name = data.get("name")
@@ -166,19 +168,13 @@ def update_folder(folder_id):
             "description": folder.description,
         }
 
-        return (
-            jsonify(
-                {
-                    "message": f"Updated folder {folder.id} with {folder.name} and {folder.description}",
-                    "folder": folder_data,
-                }
-            ),
-            200,
+        return success_response(
+            message="Folder updated successfully", data={"folder": folder_data}
         )
 
     except IntegrityError:
         db.session.rollback()
-        return jsonify({"error": "Folder name already exists"}), 409
+        return duplicate_error("Folder", "name")
 
 
 # Delete a folder
@@ -189,9 +185,9 @@ def delete_folder(folder_id):
     folder = Folder.query.filter_by(id=folder_id, user_id=current_user_id).first()
 
     if not folder:
-        return jsonify({"error": "Folder not found"}), 404
+        return not_found_error("Folder", folder_id)
 
     folder_name = folder.name
     db.session.delete(folder)
     db.session.commit()
-    return jsonify({"message": f"Deleted folder '{folder_name}'"}), 200
+    return success_response(message="Folder deleted successfully")

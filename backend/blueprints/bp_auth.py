@@ -9,6 +9,12 @@ from flask_jwt_extended import (
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 from backend.models import db, User
+from backend.utils import (
+    success_response,
+    error_response,
+    duplicate_error,
+    validation_error,
+)
 
 # Initialize JSON Web Token Manager
 jwt = JWTManager()
@@ -29,6 +35,12 @@ def register():
         - password (str)
     """
     data = request.get_json()
+
+    required_fields = ["full_name", "username", "email", "password"]
+    missing_fields = [field for field in required_fields if not data.get(field)]
+    if missing_fields:
+        return validation_error(missing_fields)
+
     full_name = data.get("full_name")
     username = data.get("username")
     email = data.get("email")
@@ -47,19 +59,17 @@ def register():
     )
     db.session.add(new_user)
     db.session.commit()
-    return (
-        jsonify(
-            {
-                "message": "New user created",
-                "user": {
-                    "id": new_user.id,
-                    "full_name": new_user.full_name,
-                    "username": new_user.username,
-                    "email": new_user.email,
-                },
+    return success_response(
+        message="User created successfully",
+        data={
+            "user": {
+                "id": new_user.id,
+                "full_name": new_user.full_name,
+                "username": new_user.username,
+                "email": new_user.email,
             }
-        ),
-        201,
+        },
+        status_code=201,
     )
 
 
@@ -72,6 +82,13 @@ def login():
         - password (str): user's plain string password
     """
     data = request.get_json()
+
+    # Validate required fields
+    required_fields = ["login", "password"]
+    missing_fields = [field for field in required_fields if not data.get(field)]
+    if missing_fields:
+        return validation_error(missing_fields)
+
     login = data.get("login")
     password = data.get("password")
 
@@ -82,18 +99,17 @@ def login():
     if user and check_password_hash(user.password_hash, password):
         # Create an access token based on user's id
         access_token = create_access_token(identity=user.id)
-        return (
-            jsonify(
-                {
-                    "message": "Login successful",
-                    "access_token": access_token,
-                    "user_id": user.id,
-                }
-            ),
-            200,
+        return success_response(
+            message="Login successful",
+            data={
+                "access_token": access_token,
+                "user_id": user.id,
+            },
         )
 
-    return jsonify({"error": "Invalid credentials"}), 400
+    return error_response(
+        message="Invalid credentials", code="INVALID_CREDENTIALS", status_code=401
+    )
 
 
 @auth_bp.route("/logout", methods=["POST"])
@@ -101,7 +117,7 @@ def login():
 def logout():
     jti = get_jwt()["jti"]  # JWT unique identifier
     blacklisted_tokens.add(jti)
-    return jsonify({"message": f"Access token revoked for user {jti}"}), 200
+    return success_response(message="Logout successful")
 
 
 @auth_bp.route("/protected", methods=["GET"])
@@ -109,7 +125,10 @@ def logout():
 def protected():
     jti = get_jwt()["jti"]
     if jti in blacklisted_tokens:
-        return jsonify({"message": "Token has been revoked"}), 401
+        return error_response(
+            message="Token has been revoked", code="TOKEN_REVOKED", status_code=401
+        )
     current_user_id = get_jwt_identity()
     user = db.session.get(User, current_user_id)
-    return jsonify({"id": user.id, "username": user.username}), 200
+
+    return success_response(data={"user": {"id": user.id, "username": user.username}})

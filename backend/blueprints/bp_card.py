@@ -1,9 +1,16 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from backend.models import db, Deck, Card, Review, Folder
 from datetime import datetime, timedelta
 from backend.services.review_service import ReviewService
-
+from backend.utils import (
+    success_response,
+    error_response,
+    data_response,
+    validation_error,
+    not_found_error,
+    duplicate_error,
+)
 
 card_bp = Blueprint("card", __name__)
 
@@ -12,7 +19,7 @@ card_bp = Blueprint("card", __name__)
 @jwt_required()
 def add_card(deck_id):
     """Logic to create a new card"""
-    # Verify ownership of the card
+    # Verify ownership of the deck
     current_user_id = get_jwt_identity()
     deck = (
         Deck.query.join(Folder)
@@ -20,27 +27,28 @@ def add_card(deck_id):
         .first()
     )
     if not deck:
-        return jsonify({"error": "Deck not found"}), 404
+        return not_found_error("Deck", deck_id)
 
     data = request.get_json()
-    question = data.get("question")
-    answer = data.get("answer")
+
+    # Validate required fields
+    required_fields = ["question", "answer", "difficulty_level"]
+    missing_fields = [field for field in required_fields if not data.get(field)]
+    if missing_fields:
+        return validation_error(missing_fields)
+
+    question = data.get("question").strip()
+    answer = data.get("answer").strip()
     difficulty_level = data.get("difficulty_level")
+
+    # Check for duplicate question in the same deck
+    if Card.query.filter_by(deck_id=deck_id, question=question).first():
+        return duplicate_error("Card", "question")
 
     # If the card is created for the first time,
     # next review should be in the next 24 hours
-    # and the review_count is set as the default value of 0
     next_review_at = datetime.utcnow() + timedelta(days=1)
     review_count = data.get("review_count", 0)
-
-    if not question or not answer or not difficulty_level:
-        return jsonify({"error": "Missing required fields"}), 400
-
-    question = question.strip()
-    answer = answer.strip()
-
-    if Card.query.filter_by(deck_id=deck_id, question=question).first():
-        return jsonify({"error": "Question already exists"}), 409
 
     card = Card(
         question=question,
@@ -54,23 +62,21 @@ def add_card(deck_id):
     db.session.add(card)
     db.session.commit()
 
-    return (
-        jsonify(
-            {
-                "message": "Added a new card",
-                "card": {
-                    "id": card.id,  # Changed from "card_id" to "id"
-                    "question": card.question,
-                    "answer": card.answer,
-                    "difficulty_level": card.difficulty_level,
-                    "next_review_at": card.next_review_at.isoformat(),
-                    "review_count": card.review_count,
-                    "is_fully_reviewed": card.is_fully_reviewed,
-                    "last_reviewed": None,  # Added for consistency
-                },
+    return success_response(
+        message="Card created successfully",
+        data={
+            "card": {
+                "id": card.id,
+                "question": card.question,
+                "answer": card.answer,
+                "difficulty_level": card.difficulty_level,
+                "next_review_at": card.next_review_at.isoformat(),
+                "review_count": card.review_count,
+                "is_fully_reviewed": card.is_fully_reviewed,
+                "last_reviewed": None,
             }
-        ),
-        201,
+        },
+        status_code=201,
     )
 
 
@@ -89,7 +95,7 @@ def get_card(card_id):
     )
 
     if not card:
-        return jsonify({"error": "Card not found"}), 404
+        return not_found_error("Card", card_id)
 
     card_data = {
         "id": card.id,
@@ -104,10 +110,9 @@ def get_card(card_id):
         "last_reviewed": card.last_reviewed.isoformat() if card.last_reviewed else None,
     }
 
-    return jsonify({"message": f"Card {card.id} is retrieved", "card": card_data}), 200
+    return success_response(data={"card": card_data})
 
 
-# Update a card's information partially
 @card_bp.route("/<int:card_id>", methods=["PATCH"])
 @jwt_required()
 def update_card(card_id):
@@ -120,7 +125,7 @@ def update_card(card_id):
         .first()
     )
     if not card:
-        return jsonify({"error": "Card not found"}), 404
+        return not_found_error("Card", card_id)
 
     data = request.get_json()
     question = data.get("question")
@@ -128,47 +133,44 @@ def update_card(card_id):
     difficulty_level = data.get("difficulty_level")
 
     if question:
+        question = question.strip()
         # Prevent duplicate question in same deck
         existing = Card.query.filter(
             Card.deck_id == card.deck_id, Card.question == question, Card.id != card.id
         ).first()
         if existing:
-            return jsonify({"error": "Question already exists"}), 409
+            return duplicate_error("Card", "question")
         card.question = question
 
     if answer:
-        card.answer = answer
+        card.answer = answer.strip()
     if difficulty_level:
         card.difficulty_level = difficulty_level
 
     db.session.commit()
 
-    # Return the updated card data for consistency
-    return (
-        jsonify(
-            {
-                "message": f"Updated card {card.id}",
-                "card": {
-                    "id": card.id,
-                    "question": card.question,
-                    "answer": card.answer,
-                    "difficulty_level": card.difficulty_level,
-                    "next_review_at": (
-                        card.next_review_at.isoformat() if card.next_review_at else None
-                    ),
-                    "review_count": card.review_count,
-                    "is_fully_reviewed": card.is_fully_reviewed,
-                    "last_reviewed": (
-                        card.last_reviewed.isoformat() if card.last_reviewed else None
-                    ),
-                },
+    # Return the updated card data
+    return success_response(
+        message="Card updated successfully",
+        data={
+            "card": {
+                "id": card.id,
+                "question": card.question,
+                "answer": card.answer,
+                "difficulty_level": card.difficulty_level,
+                "next_review_at": (
+                    card.next_review_at.isoformat() if card.next_review_at else None
+                ),
+                "review_count": card.review_count,
+                "is_fully_reviewed": card.is_fully_reviewed,
+                "last_reviewed": (
+                    card.last_reviewed.isoformat() if card.last_reviewed else None
+                ),
             }
-        ),
-        200,
+        },
     )
 
 
-# Delete a card
 @card_bp.route("/<int:card_id>", methods=["DELETE"])
 @jwt_required()
 def delete_card(card_id):
@@ -181,9 +183,9 @@ def delete_card(card_id):
         .first()
     )
     if not card:
-        return jsonify({"error": "Card not found"}), 404
+        return not_found_error("Card", card_id)
 
     db.session.delete(card)
     db.session.commit()
 
-    return jsonify({"message": f"Deleted card {card.id}"}), 200
+    return success_response(message="Card deleted successfully")

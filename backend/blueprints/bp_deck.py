@@ -3,6 +3,14 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from backend.models import db, Folder, Deck, Card
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime
+from backend.utils import (
+    success_response,
+    error_response,
+    data_response,
+    validation_error,
+    not_found_error,
+    duplicate_error,
+)
 
 deck_bp = Blueprint("deck", __name__)
 
@@ -16,18 +24,18 @@ def add_deck(folder_id):
 
     # Validate input
     if not data:
-        return jsonify({"error": "No data provided"}), 400
+        return validation_error(["name"])
 
     name = data.get("name")
     description = data.get("description", "")
 
     if not name:
-        return jsonify({"error": "Deck name is required"}), 400
+        return validation_error(["name"])
 
     # Verify folder exists and belongs to user
     folder = Folder.query.filter_by(id=folder_id, user_id=current_user_id).first()
     if not folder:
-        return jsonify({"error": "Folder not found"}), 404
+        return not_found_error("Folder", folder_id)
 
     # Check for existing deck name (case-insensitive)
     existing_deck = Deck.query.filter(
@@ -48,25 +56,25 @@ def add_deck(folder_id):
         db.session.add(deck)
         db.session.commit()
 
-        return (
-            jsonify(
-                {
-                    "message": "Deck created successfully",
-                    "deck": {
-                        "id": deck.id,
-                        "name": deck.name,
-                        "description": deck.description,
-                        "folder_id": deck.folder_id,
-                        "cardCount": len(deck.cards),
-                    },
+        return success_response(
+            message="Deck created successfully",
+            data={
+                "deck": {
+                    "id": deck.id,
+                    "name": deck.name,
+                    "description": deck.description,
+                    "folder_id": deck.folder_id,
+                    "cardCount": len(deck.cards),
                 }
-            ),
-            201,
+            },
+            status_code=201,
         )
 
     except IntegrityError:
         db.session.rollback()
-        return jsonify({"error": "Database error occurred"}), 500
+        return error_response(
+            message="Database error occurred", code="DATABASE_ERROR", status_code=500
+        )
 
 
 @deck_bp.route("/<int:deck_id>", methods=["GET"])
@@ -82,44 +90,35 @@ def get_one_deck(deck_id):
     )
 
     if not deck:
-        return jsonify({"error": "Deck not found"}), 404
+        return not_found_error("Deck", deck_id)
 
-    return (
-        jsonify(
+    deck_data = {
+        "id": deck.id,
+        "name": deck.name,
+        "description": deck.description,
+        "folder_id": deck.folder_id,
+        "cards": [
             {
-                "deck": {
-                    "id": deck.id,
-                    "name": deck.name,
-                    "description": deck.description,
-                    "folder_id": deck.folder_id,
-                    "cards": [
-                        {
-                            "id": card.id,
-                            "question": card.question,
-                            "answer": card.answer,
-                            "difficulty_level": card.difficulty_level,
-                            "next_review_at": (
-                                card.next_review_at.isoformat()
-                                if card.next_review_at
-                                else None
-                            ),
-                            "review_count": card.review_count,
-                            "is_fully_reviewed": card.is_fully_reviewed,
-                            "last_reviewed": (
-                                card.last_reviewed.isoformat()
-                                if card.last_reviewed
-                                else None
-                            ),
-                        }
-                        for card in deck.cards
-                    ],
-                    "created_at": deck.created_at.isoformat(),
-                    "updated_at": deck.updated_at.isoformat(),
-                }
+                "id": card.id,
+                "question": card.question,
+                "answer": card.answer,
+                "difficulty_level": card.difficulty_level,
+                "next_review_at": (
+                    card.next_review_at.isoformat() if card.next_review_at else None
+                ),
+                "review_count": card.review_count,
+                "is_fully_reviewed": card.is_fully_reviewed,
+                "last_reviewed": (
+                    card.last_reviewed.isoformat() if card.last_reviewed else None
+                ),
             }
-        ),
-        200,
-    )
+            for card in deck.cards
+        ],
+        "created_at": deck.created_at.isoformat(),
+        "updated_at": deck.updated_at.isoformat(),
+    }
+
+    return success_response(data={"deck": deck_data})
 
 
 @deck_bp.route("/<int:deck_id>", methods=["PATCH"])
@@ -135,7 +134,7 @@ def update_deck(deck_id):
     )
 
     if not deck:
-        return jsonify({"error": "Deck not found"}), 404
+        return not_found_error("Deck", deck_id)
 
     name = data.get("name")
     description = data.get("description")
@@ -149,7 +148,7 @@ def update_deck(deck_id):
         ).first()
 
         if existing_deck:
-            return jsonify({"error": "Deck name already exists in this folder"}), 409
+            return duplicate_error("Deck", "name")
 
         deck.name = name
 
@@ -160,23 +159,22 @@ def update_deck(deck_id):
 
     try:
         db.session.commit()
-        return (
-            jsonify(
-                {
-                    "message": "Deck updated successfully",
-                    "deck": {
-                        "id": deck.id,
-                        "name": deck.name,
-                        "description": deck.description,
-                        "cardCount": len(deck.cards),
-                    },
+        return success_response(
+            message="Deck updated successfully",
+            data={
+                "deck": {
+                    "id": deck.id,
+                    "name": deck.name,
+                    "description": deck.description,
+                    "cardCount": len(deck.cards),
                 }
-            ),
-            200,
+            },
         )
     except IntegrityError:
         db.session.rollback()
-        return jsonify({"error": "Database error occurred"}), 500
+        return error_response(
+            message="Database error occurred", code="DATABASE_ERROR", status_code=500
+        )
 
 
 @deck_bp.route("/<int:deck_id>", methods=["DELETE"])
@@ -191,12 +189,17 @@ def delete_deck(deck_id):
     )
 
     if not deck:
-        return jsonify({"error": "Deck not found"}), 404
+        return not_found_error("Deck", deck_id)
 
     try:
         db.session.delete(deck)
         db.session.commit()
-        return jsonify({"message": "Deck deleted successfully"}), 200
+        return success_response(message="Deck deleted successfully")
     except Exception as e:
         db.session.rollback()
-        return jsonify({"error": "Failed to delete deck", "details": str(e)}), 500
+        return error_response(
+            message="Failed to delete deck",
+            code="DELETE_ERROR",
+            details={"error": str(e)},
+            status_code=500,
+        )
