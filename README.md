@@ -17,5 +17,6 @@ https://github.com/user-attachments/assets/80f1a68c-2784-4e94-a82c-80476aa56f75
 ### RESTful APIs
 ## Frontend (JavaScript-React)
 ## How to Run the App
-## Bugs & How I Fixed Them
+## Key Takeaways
+- Standardizing the format and structure of the backend response (success, failure, duplicated, etc.) is tremendously helpful for integrating with the frontend, especially when rendering the data like lists. I encountered several bugs when fetching the data from the backend to the frontend because the structure of the response message is either nested or inconsistent.
 ## Next Steps
