@@ -119,7 +119,7 @@ def get_one_folder(folder_id):
             "name": deck.name,
             "description": deck.description,
             "cardCount": len(deck.cards),
-            "card_count": len(deck.cards),  # (alternative naming)
+            "card_count": len(deck.cards),
             "created_at": deck.created_at.isoformat() if deck.created_at else None,
             "updated_at": deck.updated_at.isoformat() if deck.updated_at else None,
         }

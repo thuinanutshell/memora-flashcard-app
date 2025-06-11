@@ -178,6 +178,8 @@ def get_general_stats():
 
     # Score history per folder
     accuracy_by_folder = {}
+    folder_id_mapping = {}  # NEW: Store folder name to ID mapping
+
     for folder in folders:
         reviews = (
             Review.query.join(Card)
@@ -192,6 +194,9 @@ def get_general_stats():
             {"timestamp": r.reviewed_at.isoformat(), "score": round(r.score, 1)}
             for r in reviews
         ]
+
+        # NEW: Store folder ID mapping
+        folder_id_mapping[folder.name] = folder.id
 
     # Study streak (consecutive days)
     reviewed_dates = sorted({r.reviewed_at.date() for r in all_reviews}, reverse=True)
@@ -209,6 +214,7 @@ def get_general_stats():
             "fully_reviewed_cards": total_fully_reviewed,
             "study_streak": streak,
             "accuracy_graph": accuracy_by_folder,
+            "folder_id_mapping": folder_id_mapping,  # NEW: Include folder ID mapping
         }
     )
 

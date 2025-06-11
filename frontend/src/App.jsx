@@ -1,49 +1,121 @@
-import 'bootstrap/dist/css/bootstrap.min.css';
-import { Outlet, Route, BrowserRouter as Router, Routes } from 'react-router-dom';
+// src/App.jsx (Add review routes)
+import { Navigate, Route, BrowserRouter as Router, Routes } from 'react-router-dom';
 import ProtectedRoute from './components/auth/ProtectedRoute';
-import Sidebar from './components/common/Sidebar';
-import DeckDetail from './components/deck/DeckDetail';
-import FolderDetail from './components/folder/FolderDetail';
-import Stats from './components/review/Stats';
-import Study from './components/review/Study';
+import Layout from './components/layout/Layout';
 import { AuthProvider } from './context/AuthContext';
-import Dashboard from './pages/Dashboard';
-import LoginPage from './pages/LoginPage';
-import SignUpPage from './pages/SignUpPage';
 
-function Layout() {
-  return (
-    <div className="d-flex">
-      <Sidebar />
-      <div className="flex-grow-1">
-        <Outlet />
-      </div>
-    </div>
-  );
-}
+// Import page components
+import CreateCardPage from './pages/CreateCardPage';
+import DeckDetailPage from './pages/DeckDetailPage';
+import EditCardPage from './pages/EditCardPage';
+import FolderDetailPage from './pages/FolderDetailPage';
+import FoldersPage from './pages/FoldersPage';
+import FolderStatsPage from './pages/FolderStatsPage';
+import HomePage from './pages/HomePage';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import ReviewDeckPage from './pages/ReviewDeckPage';
+import ReviewPage from './pages/ReviewPage';
+import StatsPage from './pages/StatsPage';
+
+// Import Bootstrap CSS
+import 'bootstrap/dist/css/bootstrap.min.css';
 
 function App() {
   return (
-    <Router>
-      <AuthProvider>
-        <div className="app-container">
-          <Routes>
-            <Route path="/register" element={<SignUpPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route element={<ProtectedRoute />}>
-              <Route element={<Layout />}>
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/folder/:folderId" element={<FolderDetail />} />
-                <Route path="/deck/:deckId" element={<DeckDetail />} />
-                <Route path="/study" element={<Study />} />
-                <Route path="/stats" element={<Stats />} />
-              </Route>
-            </Route>
-            <Route path="*" element={<div>404 Not Found</div>} />
-          </Routes>
-        </div>
-      </AuthProvider>
-    </Router>
+    <AuthProvider>
+      <Router>
+        <Routes>
+          {/* Public routes */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          
+          {/* Protected routes with layout */}
+          <Route path="/" element={
+            <ProtectedRoute>
+              <Layout>
+                <HomePage />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/folders" element={
+            <ProtectedRoute>
+              <Layout>
+                <FoldersPage />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/folders/:folderId" element={
+            <ProtectedRoute>
+              <Layout>
+                <FolderDetailPage />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/decks/:deckId" element={
+            <ProtectedRoute>
+              <Layout>
+                <DeckDetailPage />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/cards/new/:deckId" element={
+            <ProtectedRoute>
+              <Layout>
+                <CreateCardPage />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/cards/edit/:cardId" element={
+            <ProtectedRoute>
+              <Layout>
+                <EditCardPage />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/review" element={
+            <ProtectedRoute>
+              <Layout>
+                <ReviewPage />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/review/:deckId" element={
+            <ProtectedRoute>
+              <Layout>
+                <ReviewDeckPage />
+              </Layout>
+            </ProtectedRoute>
+          } />
+
+          <Route path="/stats" element={
+            <ProtectedRoute>
+              <Layout>
+                <StatsPage />
+              </Layout>
+            </ProtectedRoute>
+          } />
+
+          <Route path="/stats/folder/:folderId" element={
+            <ProtectedRoute>
+              <Layout>
+                <FolderStatsPage />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          {/* Redirect any unknown routes to home */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Router>
+    </AuthProvider>
   );
 }
 
