@@ -1,148 +1,89 @@
-import { createContext, useCallback, useEffect, useState } from 'react';
-import * as authApi from '../api/authApi';
+// src/context/AuthContext.jsx
+import { createContext, useContext, useEffect, useState } from 'react';
+import { authService } from '../services/authService';
 
+// Create the context
 const AuthContext = createContext();
 
-const AuthProvider = ({ children }) => {
-  const [token, setToken_] = useState(() => {
-    try {
-      return localStorage.getItem('token');
-    } catch (error) {
-      console.error('Error reading token from localStorage:', error);
-      return null;
-    }
-  });
+// Custom hook to use the auth context
+// eslint-disable-next-line react-refresh/only-export-components
+export const useAuthContext = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuthContext must be used within an AuthProvider');
+  }
+  return context;
+};
+
+// AuthProvider component
+export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  const setToken = (newToken) => {
-    setToken_(newToken);
-    try {
-      if (newToken) {
-        localStorage.setItem('token', newToken);
-      } else {
-        localStorage.removeItem('token');
-        setUser(null);
-      }
-    } catch (error) {
-      console.error('Error managing token in localStorage:', error);
-    }
-  };
-
-  // Check if token is expired
-  const isTokenExpired = (token) => {
-    if (!token) return true;
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      const currentTime = Date.now() / 1000;
-      return payload.exp < currentTime;
-    } catch (error) {
-      console.error('Error checking token expiration:', error);
-      return true;
-    }
-  };
-
-  // Memoized fetchUser function
-  const fetchUser = useCallback(async () => {
-    try {
-      if (token) {
-        // Check if token is expired before making API call
-        if (isTokenExpired(token)) {
-          setToken(null);
-          setError('Session expired. Please log in again.');
-          return;
+  // Check if user is logged in on app start
+  useEffect(() => {
+    const initializeAuth = async () => {
+      try {
+        // Check if token exists in localStorage
+        if (authService.isAuthenticated()) {
+          // Verify token with backend
+          const response = await authService.getProtected();
+          if (response.success) {
+            setUser(response.data.user);
+            setIsAuthenticated(true);
+          } else {
+            // Token is invalid, clear it
+            authService.logout();
+            setIsAuthenticated(false);
+          }
         }
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+        // Clear any invalid tokens
+        authService.logout();
+        setIsAuthenticated(false);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-        const userData = await authApi.verifyToken(token);
-        setUser(userData);
-        setError(null);
-      }
-    } catch (err) {
-      console.error('Error fetching user:', err);
-      
-      // Handle different types of errors
-      if (err.message?.includes('401') || err.message?.includes('unauthorized')) {
-        setToken(null);
-        setError('Session expired. Please log in again.');
-      } else if (err.message?.includes('Network')) {
-        setError('Network error. Please check your connection.');
-      } else {
-        setToken(null);
-        setError(err.message || 'An error occurred while verifying your session.');
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [token]);
+    initializeAuth();
+  }, []);
 
   // Login function
   const login = async (credentials) => {
+    setLoading(true);
     try {
-      setLoading(true);
-      setError(null);
-      
-      const response = await authApi.login(credentials);
-      
-      if (!response.access_token) {
-        throw new Error('Invalid response from server');
-      }
-      
-      setToken(response.access_token);
-      
-      // Fetch user data after successful login
-      if (response.user_id || response.access_token) {
+        const response = await authService.login(credentials);
+        if (response.success) {
+        setIsAuthenticated(true);
+        
+        // Fetch user profile after successful login
         try {
-          const userData = await authApi.verifyToken(response.access_token);
-          setUser(userData);
-        } catch (userErr) {
-          console.error('Error fetching user data after login:', userErr);
-          // Don't fail login if user fetch fails
+            const profileResponse = await authService.getProtected();
+            if (profileResponse.success) {
+            setUser(profileResponse.data.user);
+            }
+        } catch (profileError) {
+            console.error('Failed to fetch user profile:', profileError);
         }
-      }
-      
-      return { success: true };
-    } catch (err) {
-      console.error('Login error:', err);
-      
-      let errorMessage = 'Login failed. Please try again.';
-      if (err.message?.includes('401') || err.message?.includes('400')) {
-        errorMessage = 'Invalid credentials. Please check your email/username and password.';
-      } else if (err.message?.includes('Network')) {
-        errorMessage = 'Network error. Please check your connection.';
-      } else if (err.message) {
-        errorMessage = err.message;
-      }
-      
-      setError(errorMessage);
-      return { success: false, error: errorMessage };
+        
+        return response;
+        }
+        throw new Error('Login failed');
+    } catch (error) {
+        throw error;
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
-  };
+    };
 
   // Register function
   const register = async (userData) => {
+    setLoading(true);
     try {
-      setLoading(true);
-      setError(null);
-      
-      await authApi.register(userData);
-      return { success: true };
-    } catch (err) {
-      console.error('Registration error:', err);
-      
-      let errorMessage = 'Registration failed. Please try again.';
-      if (err.message?.includes('409') || err.message?.includes('already exists')) {
-        errorMessage = 'User already exists. Please try logging in instead.';
-      } else if (err.message?.includes('Network')) {
-        errorMessage = 'Network error. Please check your connection.';
-      } else if (err.message) {
-        errorMessage = err.message;
-      }
-      
-      setError(errorMessage);
-      return { success: false, error: errorMessage };
+      return await authService.register(userData);
     } finally {
       setLoading(false);
     }
@@ -150,61 +91,39 @@ const AuthProvider = ({ children }) => {
 
   // Logout function
   const logout = async () => {
+    setLoading(true);
     try {
-      if (token) {
-        await authApi.logout(token);
-      }
-    } catch (err) {
-      console.error('Logout error:', err);
-      // Don't block logout if API call fails
+      await authService.logout();
+    } catch (error) {
+      console.error('Logout error:', error);
     } finally {
-      setToken(null);
       setUser(null);
-      setError(null);
+      setIsAuthenticated(false);
+      setLoading(false);
     }
   };
 
-  // Clear error function
-  const clearError = () => {
-    setError(null);
+  // Update user info
+  const updateUser = (userData) => {
+    setUser(prevUser => ({ ...prevUser, ...userData }));
   };
 
-  // Verify token on mount and when token changes
-  useEffect(() => {
-    fetchUser();
-  }, [fetchUser]);
-
-  // Auto-logout on token expiration (check every 30 seconds)
-  useEffect(() => {
-    if (!token) return;
-
-    const interval = setInterval(() => {
-      if (isTokenExpired(token)) {
-        logout();
-      }
-    }, 30000); // Check every 30 seconds
-
-    return () => clearInterval(interval);
-  }, [token]);
-
-  const contextValue = {
-    token,
+  // Context value
+  const value = {
     user,
+    isAuthenticated,
     loading,
-    error,
-    setToken,
     login,
     register,
     logout,
-    clearError,
-    isAuthenticated: !!token && !isTokenExpired(token)
+    updateUser
   };
 
   return (
-    <AuthContext.Provider value={contextValue}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
 };
 
-export { AuthContext, AuthProvider };
+export default AuthContext;
