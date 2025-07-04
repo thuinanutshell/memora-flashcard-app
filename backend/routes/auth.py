@@ -12,16 +12,25 @@ def register():
     try:
         if not request.is_json:
             return jsonify({"error": "Request must be JSON"}), 400
+        try:
+            user_data = request.get_json()
+        except Exception:
+            return jsonify({"error": "Invalid JSON format"}), 400
 
-        # Get data from the user's request
-        user_data = request.get_json()
         if user_data is None:
             return jsonify({"error": "Request body must contain valid JSON"}), 400
 
         result = AuthService.register_user(user_data)
-        return jsonify("message": "User registered successfully", 
-                       "data": result["data"],
-                       "access_token": result["access_token"]), 201
+        return (
+            jsonify(
+                {
+                    "message": "User registered successfully",
+                    "data": result["data"],
+                    "access_token": result["access_token"],
+                }
+            ),
+            201,
+        )
 
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
@@ -43,9 +52,16 @@ def login():
             return jsonify({"error": "Request body must contain valid JSON"}), 400
 
         result = AuthService.login_user(login_data)
-        return jsonify("message": "User logged in successfully", 
-                       "data": result["data"],
-                       "access_token": result["access_token"]), 200
+        return (
+            jsonify(
+                {
+                    "message": "User logged in successfully",
+                    "data": result["data"],
+                    "access_token": result["access_token"],
+                }
+            ),
+            200,
+        )
 
     except ValueError as e:
         # Handle validation errors from service
@@ -70,20 +86,25 @@ def logout():
 def get_current_user():
     try:
         user_id = get_jwt_identity()
-        user = User.query.get(user_id)
-        
+        user = db.session.get(User, user_id)
+
         if not user:
             return jsonify({"error": "User not found"}), 404
-            
-        return jsonify({
-            "message": "Retrieved current user successfully",
-            "data": {
-                "id": user.id,
-                "full_name": user.full_name,
-                "username": user.username,
-                "email": user.email
-            }
-        }), 200
-        
+
+        return (
+            jsonify(
+                {
+                    "message": "Retrieved current user successfully",
+                    "data": {
+                        "id": user.id,
+                        "full_name": user.full_name,
+                        "username": user.username,
+                        "email": user.email,
+                    },
+                }
+            ),
+            200,
+        )
+
     except Exception as e:
         return jsonify({"error": "Failed to get user info"}), 500

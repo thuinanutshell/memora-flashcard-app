@@ -71,7 +71,7 @@ class CRUDService:
             .first()
         )
         if not deck:
-            return not_found_error("Deck", deck_id)
+            raise ValueError("Deck is not found")
         required_fields = ["question", "answer", "difficulty_level"]
         for field in required_fields:
             if field not in card_data or card_data[field] is None:
@@ -189,7 +189,7 @@ class CRUDService:
                     "next_review_at": card.next_review_at,
                     "review_count": card.review_count,
                     "is_fully_reviewed": card.is_fully_reviewed,
-                    "last_reviewed": card.last_reviewed,
+                    "last_reviewed_at": card.last_reviewed_at,
                 }
                 for card in all_cards
             ]

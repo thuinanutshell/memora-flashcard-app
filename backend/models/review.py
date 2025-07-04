@@ -1,4 +1,4 @@
-from base import db
+from models.base import db
 from typing import List
 import datetime
 import uuid
@@ -46,7 +46,7 @@ class Review(db.Model):
 
     # Many-to-one relationship with the User model
     user_id: Mapped[str] = mapped_column(ForeignKey("user.id"), nullable=False)
-    user: Mapped["User"] = relationship("User")
+    user: Mapped["User"] = relationship("User", back_populates="reviews")
 
     def __repr__(self):
         return f"<Review id={self.id} score={self.score} card_id={self.card_id}>"

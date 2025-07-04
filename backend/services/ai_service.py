@@ -14,6 +14,198 @@ class AIService:
     def __init__(self):
         self.client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
+    def generate_cards_from_pdf(
+        self, pdf_file, num_cards, deck_id, difficulty="medium"
+    ):
+        """Generate flashcards from PDF using Gemini's native PDF processing."""
+        try:
+            import tempfile
+            import os
+
+            # Read PDF file content
+            pdf_content = pdf_file.read()
+
+            # Create a temporary file for Gemini upload
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+                temp_file.write(pdf_content)
+                temp_file_path = temp_file.name
+
+            try:
+                # Upload PDF to Gemini
+                uploaded_file = genai.upload_file(temp_file_path)
+
+                # Wait for file to be processed
+                import time
+
+                while uploaded_file.state.name == "PROCESSING":
+                    print("Processing PDF...")
+                    time.sleep(2)
+                    uploaded_file = genai.get_file(uploaded_file.name)
+
+                if uploaded_file.state.name == "FAILED":
+                    raise ValueError("Failed to process PDF file")
+
+                # Create prompt for flashcard generation
+                prompt = f"""
+                Analyze this PDF document and create exactly {num_cards} high-quality flashcards.
+                
+                Requirements:
+                - Difficulty level: {difficulty}
+                - Focus on the most important concepts from the document
+                - Create questions that test understanding, not just memorization
+                - Make answers complete but concise
+                - Ensure questions are clear and specific
+                
+                Return ONLY a valid JSON array with this exact format:
+                [
+                    {{
+                        "question": "Clear, specific question here",
+                        "answer": "Complete, accurate answer here", 
+                        "difficulty_level": "{difficulty}"
+                    }}
+                ]
+                
+                Do not include any text outside the JSON array.
+                """
+
+                # Generate content with uploaded PDF
+                response = self.client.models.generate_content(
+                    model="gemini-1.5-flash",
+                    contents=[prompt, uploaded_file],
+                    config=types.GenerateContentConfig(
+                        thinking_config=types.ThinkingConfig(thinking_budget=0)
+                    ),
+                )
+
+                # Parse JSON response
+                try:
+                    # Clean the response text (remove any markdown formatting)
+                    response_text = response.text.strip()
+                    if response_text.startswith("```json"):
+                        response_text = response_text[7:]
+                    if response_text.endswith("```"):
+                        response_text = response_text[:-3]
+                    response_text = response_text.strip()
+
+                    cards_data = json.loads(response_text)
+
+                    if not isinstance(cards_data, list):
+                        raise ValueError("AI response is not a list")
+
+                    if len(cards_data) == 0:
+                        raise ValueError("No cards generated from PDF")
+
+                except json.JSONDecodeError as e:
+                    raise ValueError(f"Invalid JSON response from AI: {str(e)}")
+
+                # Clean up uploaded file from Gemini
+                try:
+                    genai.delete_file(uploaded_file.name)
+                except:
+                    pass  # Don't fail if cleanup fails
+
+                # Format response
+                return {
+                    "data": {
+                        "preview": True,
+                        "deck_id": deck_id,
+                        "cards": cards_data,
+                        "source": "pdf",
+                        "metadata": {
+                            "num_cards_generated": len(cards_data),
+                            "num_cards_requested": num_cards,
+                            "difficulty": difficulty,
+                            "file_name": pdf_file.filename,
+                        },
+                    }
+                }
+
+            finally:
+                if os.path.exists(temp_file_path):
+                    os.unlink(temp_file_path)
+
+        except Exception as e:
+            raise ValueError(f"Failed to process PDF: {str(e)}")
+
+    def generate_cards_from_text(
+        self, content, num_cards, deck_id, difficulty="medium"
+    ):
+        """Generate flashcards from text content."""
+        try:
+            # Create prompt for text-based flashcard generation
+            prompt = f"""
+            Create exactly {num_cards} flashcards from the following content.
+            
+            Content:
+            {content}
+            
+            Requirements:
+            - Difficulty level: {difficulty}
+            - Focus on key concepts and important information
+            - Create questions that test understanding
+            - Make answers complete but concise
+            
+            Return ONLY a valid JSON array with this exact format:
+            [
+                {{
+                    "question": "Clear, specific question here",
+                    "answer": "Complete, accurate answer here", 
+                    "difficulty_level": "{difficulty}"
+                }}
+            ]
+            
+            Do not include any text outside the JSON array.
+            """
+
+            # Generate content
+            response = self.client.models.generate_content(
+                model="gemini-1.5-flash",
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    thinking_config=types.ThinkingConfig(thinking_budget=0)
+                ),
+            )
+
+            # Parse JSON response
+            try:
+                # Clean the response text
+                response_text = response.text.strip()
+                if response_text.startswith("```json"):
+                    response_text = response_text[7:]
+                if response_text.endswith("```"):
+                    response_text = response_text[:-3]
+                response_text = response_text.strip()
+
+                cards_data = json.loads(response_text)
+
+                if not isinstance(cards_data, list):
+                    raise ValueError("AI response is not a list")
+
+                if len(cards_data) == 0:
+                    raise ValueError("No cards generated from content")
+
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Invalid JSON response from AI: {str(e)}")
+
+            # Format response
+            return {
+                "data": {
+                    "preview": True,
+                    "deck_id": deck_id,
+                    "cards": cards_data,
+                    "source": "text",
+                    "metadata": {
+                        "num_cards_generated": len(cards_data),
+                        "num_cards_requested": num_cards,
+                        "difficulty": difficulty,
+                        "content_length": len(content),
+                    },
+                }
+            }
+
+        except Exception as e:
+            raise ValueError(f"Failed to generate cards from text: {str(e)}")
+
     @staticmethod
     def estimate_tokens(text):
         """Rough token estimation"""

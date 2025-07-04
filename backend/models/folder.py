@@ -1,4 +1,4 @@
-from base import db
+from models.base import db
 from typing import List
 import datetime
 import uuid
