@@ -9,7 +9,7 @@ from routes.auth import bp_auth
 from routes.folders import bp_folder
 from routes.cards import bp_card
 from routes.decks import bp_deck
-from routes.review import bp_review
+from routes.reviews import bp_review
 from routes.analytics import bp_analytics
 from routes.ai import bp_ai
 from services.auth_service import jwt_manager

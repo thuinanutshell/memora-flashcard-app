@@ -4,15 +4,29 @@ from models.ai import AIConversation
 from models.folder import Folder
 from models.deck import Deck
 from models.review import Review
-from google import genai
-from google.genai import types
 import os
 import json
 
 
 class AIService:
     def __init__(self):
-        self.client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+        self._client = None
+
+    @property
+    def client(self):
+        """Lazy initialization of the Gemini client."""
+        if self._client is None:
+            api_key = os.getenv("GEMINI_API_KEY")
+            if not api_key:
+                raise ValueError("GEMINI_API_KEY environment variable is required")
+
+            try:
+                from google import genai
+
+                self._client = genai.Client(api_key=api_key)
+            except ImportError:
+                raise ImportError("google-genai package is required for AI features")
+        return self._client
 
     def generate_cards_from_pdf(
         self, pdf_file, num_cards, deck_id, difficulty="medium"

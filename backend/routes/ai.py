@@ -4,8 +4,13 @@ from services.ai_service import AIService
 
 bp_ai = Blueprint("ai", __name__)
 
-# Initialize AI service instance
-ai_service = AIService()
+
+def get_ai_service():
+    """Get AI service instance with proper error handling."""
+    try:
+        return AIService()
+    except (ValueError, ImportError) as e:
+        return None
 
 
 @bp_ai.route("/chat", methods=["POST"])
@@ -25,6 +30,17 @@ def ai_chat():
     - Conversation ID for reference
     """
     try:
+        ai_service = get_ai_service()
+        if not ai_service:
+            return (
+                jsonify(
+                    {
+                        "error": "AI service is not available. Please check configuration."
+                    }
+                ),
+                503,
+            )
+
         user_id = get_jwt_identity()
 
         if not request.is_json:
@@ -84,6 +100,17 @@ def generate_flashcards_from_pdf():
     - User can review and accept via /ai/accept-cards
     """
     try:
+        ai_service = get_ai_service()
+        if not ai_service:
+            return (
+                jsonify(
+                    {
+                        "error": "AI service is not available. Please check configuration."
+                    }
+                ),
+                503,
+            )
+
         user_id = get_jwt_identity()
 
         # Check if file is present
@@ -172,6 +199,17 @@ def generate_flashcards():
     - User can accept/reject before saving
     """
     try:
+        ai_service = get_ai_service()
+        if not ai_service:
+            return (
+                jsonify(
+                    {
+                        "error": "AI service is not available. Please check configuration."
+                    }
+                ),
+                503,
+            )
+
         user_id = get_jwt_identity()
 
         if not request.is_json:
