@@ -1,5 +1,12 @@
 # Memora - AI-powered Flashcard App
+![Flask](https://img.shields.io/badge/Flask-000000?style=for-the-badge&logo=flask&logoColor=white)
+![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![Google Gemini API](https://img.shields.io/badge/Gemini%20API-4285F4?style=for-the-badge&logo=google&logoColor=white)
+![Pytest](https://img.shields.io/badge/Pytest-0A9EDC?style=for-the-badge&logo=pytest&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+
 During this summer, I have to prepare for technical interviews. There are many new and old concepts that I have to learn. So I want a space to help me perform deliberate practice and record my thought processes along the way. Memora is a flashcard app that helps you create, organize, and analyze your study decks and cards as well as keep track of your progress.
+
 
 # Table of Content
 1. [Key Features](#key-features)
