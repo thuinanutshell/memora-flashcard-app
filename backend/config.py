@@ -24,18 +24,23 @@ class DevelopmentConfig(BaseConfig):
 
 
 class ProductionConfig(BaseConfig):
-    """Production configuration"""
-
     DEBUG = False
     TESTING = False
     SQLALCHEMY_DATABASE_URI = os.getenv("PROD_DATABASE_URI", "sqlite:///production.db")
     JWT_SECRET_KEY = os.getenv("PROD_JWT_SECRET_KEY")
     REDIS_URL = os.getenv("PROD_REDIS_URL", "redis://localhost:6379/0")
 
-    # Validation for production
-    def __init__(self):
-        if not os.getenv("PROD_JWT_SECRET_KEY"):
-            raise ValueError("PROD_JWT_SECRET_KEY must be set in production")
+    @classmethod
+    def init_app(cls, app):
+        BaseConfig.init_app(app)
+
+        # Validate critical production settings
+        required_vars = ["PROD_JWT_SECRET_KEY", "PROD_DATABASE_URI"]
+        missing = [var for var in required_vars if not os.getenv(var)]
+        if missing:
+            raise ValueError(
+                f"Missing required production environment variables: {missing}"
+            )
 
 
 class TestingConfig(BaseConfig):
