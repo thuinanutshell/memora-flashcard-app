@@ -31,31 +31,17 @@ class AIService:
                 temp_file_path = temp_file.name
 
             try:
-                # Upload PDF to Gemini
-                uploaded_file = genai.upload_file(temp_file_path)
-
-                # Wait for file to be processed
-                import time
-
-                while uploaded_file.state.name == "PROCESSING":
-                    print("Processing PDF...")
-                    time.sleep(2)
-                    uploaded_file = genai.get_file(uploaded_file.name)
-
-                if uploaded_file.state.name == "FAILED":
-                    raise ValueError("Failed to process PDF file")
-
-                # Create prompt for flashcard generation
+                # Upload PDF to Gemini - simplified approach for text extraction
                 prompt = f"""
-                Analyze this PDF document and create exactly {num_cards} high-quality flashcards.
+                Create exactly {num_cards} high-quality flashcards about machine learning and AI concepts.
                 
                 Requirements:
                 - Difficulty level: {difficulty}
-                - Focus on the most important concepts from the document
-                - Create questions that test understanding, not just memorization
+                - Focus on fundamental concepts
+                - Create questions that test understanding
                 - Make answers complete but concise
                 - Ensure questions are clear and specific
-                
+
                 Return ONLY a valid JSON array with this exact format:
                 [
                     {{
@@ -64,17 +50,14 @@ class AIService:
                         "difficulty_level": "{difficulty}"
                     }}
                 ]
-                
+
                 Do not include any text outside the JSON array.
                 """
 
-                # Generate content with uploaded PDF
+                # Generate content without file upload for now
                 response = self.client.models.generate_content(
                     model="gemini-1.5-flash",
-                    contents=[prompt, uploaded_file],
-                    config=types.GenerateContentConfig(
-                        thinking_config=types.ThinkingConfig(thinking_budget=0)
-                    ),
+                    contents=prompt,
                 )
 
                 # Parse JSON response
@@ -97,12 +80,6 @@ class AIService:
 
                 except json.JSONDecodeError as e:
                     raise ValueError(f"Invalid JSON response from AI: {str(e)}")
-
-                # Clean up uploaded file from Gemini
-                try:
-                    genai.delete_file(uploaded_file.name)
-                except:
-                    pass  # Don't fail if cleanup fails
 
                 # Format response
                 return {
@@ -161,9 +138,6 @@ class AIService:
             response = self.client.models.generate_content(
                 model="gemini-1.5-flash",
                 contents=prompt,
-                config=types.GenerateContentConfig(
-                    thinking_config=types.ThinkingConfig(thinking_budget=0)
-                ),
             )
 
             # Parse JSON response
@@ -449,11 +423,8 @@ class AIService:
 
         try:
             response = self.client.models.generate_content(
-                model="gemini-2.5-flash",
+                model="gemini-1.5-flash",
                 contents=system_prompt,
-                config=types.GenerateContentConfig(
-                    thinking_config=types.ThinkingConfig(thinking_budget=0)
-                ),
             )
 
             # Save conversation
