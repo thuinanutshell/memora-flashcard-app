@@ -4,6 +4,7 @@
 ![Google Gemini API](https://img.shields.io/badge/Gemini%20API-4285F4?style=for-the-badge&logo=google&logoColor=white)
 ![Pytest](https://img.shields.io/badge/Pytest-0A9EDC?style=for-the-badge&logo=pytest&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![Mantine](https://img.shields.io/badge/Mantine-339AF0?style=for-the-badge&logo=mantine&logoColor=white)
 
 During this summer, I have to prepare for technical interviews. There are many new and old concepts that I have to learn. So I want a space to help me perform deliberate practice and record my thought processes along the way. Memora is a flashcard app that helps you create, organize, and analyze your study decks and cards as well as keep track of your progress.
 
@@ -91,10 +92,15 @@ The service layer defines how we interact with the database and is where complex
 | Row 1    | Data     | More     |
 | Row 2    | Content  | Here     |
 # Frontend
-## Design
+## Design 
 https://www.figma.com/design/yTwM5Jfw4pBaNHggZQgIc6/Flashcards-Web-App?node-id=1-2&t=zc23a2Gq7XREdfmF-1
 ## Components
-
+## Iteration 1
+Backend and frontend are connectedly properly (authentication and CRUD operations work) but the UI look kinda bad
+<img width="1254" alt="Screenshot 2025-07-04 at 10 11 40 PM" src="https://github.com/user-attachments/assets/488f190f-f2b9-4f0f-a388-a3196b3bcb55" />
+<img width="1239" alt="Screenshot 2025-07-04 at 10 13 57 PM" src="https://github.com/user-attachments/assets/b2615515-f0a4-4aff-86b5-84f248612582" />
+## Iteration 2
+## Iteration 3
 
 ## Key Takeaways
 - Standardizing the format and structure of the backend response (success, failure, duplicated, etc.) is tremendously helpful for integrating with the frontend, especially when rendering the data like lists. I encountered several bugs when fetching the data from the backend to the frontend because the structure of the response message is either nested or inconsistent.
