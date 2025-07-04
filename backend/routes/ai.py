@@ -13,6 +13,294 @@ def get_ai_service():
         return None
 
 
+@bp_ai.route("/generate-cards", methods=["POST"])
+@jwt_required()
+def generate_flashcards():
+    """
+    Unified endpoint to generate flashcards from either text content OR PDF file.
+
+    For PDF Upload (multipart/form-data):
+    - file: PDF file
+    - deck_id: Target deck ID
+    - num_cards: Number of cards to generate (1-20)
+    - difficulty: easy/medium/hard (optional, default: medium)
+
+    For Text Input (application/json):
+    {
+        "content": "Text content to generate cards from",
+        "deck_id": 123,
+        "num_cards": 5,
+        "difficulty": "medium" (optional)
+    }
+
+    Returns:
+    - Generated flashcards in preview mode
+    - Consistent response format for both methods
+    """
+    try:
+        ai_service = get_ai_service()
+        if not ai_service:
+            return (
+                jsonify(
+                    {
+                        "error": "AI service is not available. Please check configuration."
+                    }
+                ),
+                503,
+            )
+
+        user_id = get_jwt_identity()
+
+        # Determine if this is a PDF upload or text input
+        is_pdf_upload = bool(
+            request.files and "file" in request.files and request.files["file"].filename
+        )
+        is_json_request = request.is_json
+
+        if is_pdf_upload:
+            return _handle_pdf_generation(ai_service, user_id)
+        elif is_json_request:
+            return _handle_text_generation(ai_service, user_id)
+        else:
+            return (
+                jsonify(
+                    {
+                        "error": "Invalid request format. Use multipart/form-data for PDF upload or application/json for text input."
+                    }
+                ),
+                400,
+            )
+
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": "Failed to generate flashcards"}), 500
+
+
+def _handle_pdf_generation(ai_service, user_id):
+    """Handle PDF file generation logic."""
+    # Validate file
+    file = request.files["file"]
+    if file.filename == "":
+        return jsonify({"error": "No file selected"}), 400
+
+    if not file.filename.lower().endswith(".pdf"):
+        return jsonify({"error": "Only PDF files are allowed"}), 400
+
+    # Check file size (limit to 10MB for Gemini)
+    file.seek(0, 2)  # Seek to end
+    file_size = file.tell()
+    file.seek(0)  # Seek back to beginning
+
+    if file_size > 10 * 1024 * 1024:  # 10MB limit
+        return jsonify({"error": "PDF file size must be less than 10MB"}), 400
+
+    # Get form parameters
+    deck_id = request.form.get("deck_id", type=int)
+    num_cards = request.form.get("num_cards", default=5, type=int)
+    difficulty = request.form.get("difficulty", "medium")
+
+    # Validate parameters
+    if not deck_id:
+        return jsonify({"error": "deck_id is required"}), 400
+
+    if num_cards < 1 or num_cards > 20:
+        return jsonify({"error": "num_cards must be between 1 and 20"}), 400
+
+    if difficulty not in ["easy", "medium", "hard"]:
+        return jsonify({"error": "difficulty must be 'easy', 'medium', or 'hard'"}), 400
+
+    # Verify deck ownership
+    if not _verify_deck_ownership(deck_id, user_id):
+        return jsonify({"error": "Deck not found or access denied"}), 404
+
+    # Generate cards from PDF
+    result = ai_service.generate_cards_from_pdf(file, num_cards, deck_id, difficulty)
+
+    # Standardize response format
+    return _format_generation_response(result, "pdf", file.filename)
+
+
+def _handle_text_generation(ai_service, user_id):
+    """Handle text content generation logic."""
+    data = request.get_json()
+
+    # Validate required fields
+    required_fields = ["content", "deck_id", "num_cards"]
+    for field in required_fields:
+        if field not in data:
+            return jsonify({"error": f"{field} is required"}), 400
+
+    content = data["content"].strip()
+    deck_id = data["deck_id"]
+    num_cards = data["num_cards"]
+    difficulty = data.get("difficulty", "medium")
+
+    # Validate inputs
+    if not content:
+        return jsonify({"error": "Content cannot be empty"}), 400
+
+    if not isinstance(deck_id, int) or deck_id <= 0:
+        return jsonify({"error": "deck_id must be a positive integer"}), 400
+
+    if not isinstance(num_cards, int) or num_cards < 1 or num_cards > 20:
+        return jsonify({"error": "num_cards must be between 1 and 20"}), 400
+
+    if difficulty not in ["easy", "medium", "hard"]:
+        return jsonify({"error": "difficulty must be 'easy', 'medium', or 'hard'"}), 400
+
+    # Verify deck ownership
+    if not _verify_deck_ownership(deck_id, user_id):
+        return jsonify({"error": "Deck not found or access denied"}), 404
+
+    # Generate cards from text
+    result = ai_service.generate_cards_from_text(
+        content, num_cards, deck_id, difficulty
+    )
+
+    # Standardize response format
+    return _format_generation_response(result, "text", None)
+
+
+def _verify_deck_ownership(deck_id, user_id):
+    """Verify that the user owns the specified deck."""
+    try:
+        from services.crud_service import CRUDService
+
+        CRUDService.get_one_deck(deck_id, user_id)
+        return True
+    except ValueError:
+        return False
+
+
+def _format_generation_response(result, generation_method, source_filename=None):
+    """Format the response consistently for both text and PDF generation."""
+    data = result["data"]
+    num_generated = len(data["cards"])
+
+    # Enhance metadata with generation method
+    metadata = data.get("metadata", {})
+    metadata["generation_method"] = generation_method
+    if source_filename:
+        metadata["source_filename"] = source_filename
+
+    # Standardized response
+    response_data = {
+        "preview": True,
+        "deck_id": data["deck_id"],
+        "generation_method": generation_method,
+        "cards": data["cards"],
+        "metadata": metadata,
+    }
+
+    success_message = (
+        f"Generated {num_generated} flashcards from {generation_method} successfully"
+    )
+
+    return jsonify({"message": success_message, "data": response_data}), 200
+
+
+@bp_ai.route("/accept-cards", methods=["POST"])
+@jwt_required()
+def accept_generated_cards():
+    """
+    Accept and save AI-generated flashcards to deck.
+
+    Request Body:
+    {
+        "deck_id": 123,
+        "cards": [
+            {
+                "question": "What is...",
+                "answer": "It is...",
+                "difficulty_level": "medium"
+            }
+        ]
+    }
+
+    Returns:
+    - Saved card IDs
+    - Success confirmation
+    """
+    try:
+        user_id = get_jwt_identity()
+
+        if not request.is_json:
+            return jsonify({"error": "Request must be JSON"}), 400
+
+        data = request.get_json()
+
+        if "deck_id" not in data or "cards" not in data:
+            return jsonify({"error": "deck_id and cards are required"}), 400
+
+        deck_id = data["deck_id"]
+        cards = data["cards"]
+
+        if not isinstance(cards, list) or len(cards) == 0:
+            return jsonify({"error": "cards must be a non-empty list"}), 400
+
+        if len(cards) > 20:
+            return jsonify({"error": "Cannot save more than 20 cards at once"}), 400
+
+        # Verify deck ownership
+        if not _verify_deck_ownership(deck_id, user_id):
+            return jsonify({"error": "Deck not found or access denied"}), 404
+
+        # Save each card using CRUD service
+        saved_cards = []
+        failed_cards = []
+
+        for i, card_data in enumerate(cards):
+            try:
+                # Validate card data
+                required_fields = ["question", "answer", "difficulty_level"]
+                for field in required_fields:
+                    if field not in card_data or not card_data[field]:
+                        raise ValueError(f"Card {i+1}: {field} is required")
+
+                # Save card
+                from services.crud_service import CRUDService
+
+                result = CRUDService.add_new_card(card_data, deck_id, user_id)
+                saved_cards.append(
+                    {
+                        "index": i + 1,
+                        "card_id": result["data"]["id"],
+                        "question": result["data"]["question"],
+                    }
+                )
+
+            except Exception as e:
+                failed_cards.append(
+                    {
+                        "index": i + 1,
+                        "error": str(e),
+                        "question": card_data.get("question", "Unknown"),
+                    }
+                )
+
+        response_data = {
+            "saved_count": len(saved_cards),
+            "failed_count": len(failed_cards),
+            "saved_cards": saved_cards,
+        }
+
+        if failed_cards:
+            response_data["failed_cards"] = failed_cards
+
+        status_code = 201 if len(saved_cards) > 0 else 400
+        message = f"Saved {len(saved_cards)} cards successfully"
+        if failed_cards:
+            message += f", {len(failed_cards)} failed"
+
+        return jsonify({"message": message, "data": response_data}), status_code
+
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": "Failed to save generated cards"}), 500
+
+
 @bp_ai.route("/chat", methods=["POST"])
 @jwt_required()
 def ai_chat():
@@ -81,299 +369,6 @@ def ai_chat():
         return jsonify({"error": str(e)}), 400
     except Exception as e:
         return jsonify({"error": "Failed to generate AI response"}), 500
-
-
-@bp_ai.route("/generate-cards-from-pdf", methods=["POST"])
-@jwt_required()
-def generate_flashcards_from_pdf():
-    """
-    Generate flashcards from uploaded PDF file using Gemini's native PDF processing.
-
-    Form Data:
-    - file: PDF file (multipart/form-data)
-    - deck_id: Target deck ID
-    - num_cards: Number of cards to generate (1-20)
-    - difficulty: easy/medium/hard (optional, default: medium)
-
-    Returns:
-    - Generated flashcards (preview mode)
-    - User can review and accept via /ai/accept-cards
-    """
-    try:
-        ai_service = get_ai_service()
-        if not ai_service:
-            return (
-                jsonify(
-                    {
-                        "error": "AI service is not available. Please check configuration."
-                    }
-                ),
-                503,
-            )
-
-        user_id = get_jwt_identity()
-
-        # Check if file is present
-        if "file" not in request.files:
-            return jsonify({"error": "No PDF file uploaded"}), 400
-
-        file = request.files["file"]
-        if file.filename == "":
-            return jsonify({"error": "No file selected"}), 400
-
-        # Validate file type
-        if not file.filename.lower().endswith(".pdf"):
-            return jsonify({"error": "Only PDF files are allowed"}), 400
-
-        # Check file size (limit to 10MB for Gemini)
-        file.seek(0, 2)  # Seek to end
-        file_size = file.tell()
-        file.seek(0)  # Seek back to beginning
-
-        if file_size > 10 * 1024 * 1024:  # 10MB limit
-            return jsonify({"error": "PDF file size must be less than 10MB"}), 400
-
-        # Get form data
-        deck_id = request.form.get("deck_id", type=int)
-        num_cards = request.form.get("num_cards", default=5, type=int)
-        difficulty = request.form.get("difficulty", "medium")
-
-        # Validate form data
-        if not deck_id:
-            return jsonify({"error": "deck_id is required"}), 400
-
-        if num_cards < 1 or num_cards > 20:
-            return jsonify({"error": "num_cards must be between 1 and 20"}), 400
-
-        if difficulty not in ["easy", "medium", "hard"]:
-            return (
-                jsonify({"error": "difficulty must be 'easy', 'medium', or 'hard'"}),
-                400,
-            )
-
-        # Verify deck ownership
-        from services.crud_service import CRUDService
-
-        try:
-            deck = CRUDService.get_one_deck(deck_id, user_id)
-        except ValueError:
-            return jsonify({"error": "Deck not found or access denied"}), 404
-
-        # Process PDF with Gemini
-        result = ai_service.generate_cards_from_pdf(
-            file, num_cards, deck_id, difficulty
-        )
-
-        return (
-            jsonify(
-                {
-                    "message": f"Generated {len(result['data']['cards'])} flashcards from PDF successfully",
-                    "data": result["data"],
-                }
-            ),
-            200,
-        )
-
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-    except Exception as e:
-        return jsonify({"error": "Failed to process PDF"}), 500
-
-
-@bp_ai.route("/generate-cards", methods=["POST"])
-@jwt_required()
-def generate_flashcards():
-    """
-    Generate flashcards from text content
-
-    Request Body:
-    {
-        "content": "Text content to generate cards from",
-        "deck_id": 123,
-        "num_cards": 5,
-        "difficulty": "medium" (optional)
-    }
-
-    Returns:
-    - Generated flashcards (preview)
-    - User can accept/reject before saving
-    """
-    try:
-        ai_service = get_ai_service()
-        if not ai_service:
-            return (
-                jsonify(
-                    {
-                        "error": "AI service is not available. Please check configuration."
-                    }
-                ),
-                503,
-            )
-
-        user_id = get_jwt_identity()
-
-        if not request.is_json:
-            return jsonify({"error": "Request must be JSON"}), 400
-
-        data = request.get_json()
-
-        # Validate required fields
-        required_fields = ["content", "deck_id", "num_cards"]
-        for field in required_fields:
-            if field not in data:
-                return jsonify({"error": f"{field} is required"}), 400
-
-        content = data["content"].strip()
-        deck_id = data["deck_id"]
-        num_cards = data["num_cards"]
-        difficulty = data.get("difficulty", "medium")
-
-        # Validate inputs
-        if not content:
-            return jsonify({"error": "Content cannot be empty"}), 400
-
-        if not isinstance(deck_id, int) or deck_id <= 0:
-            return jsonify({"error": "deck_id must be a positive integer"}), 400
-
-        if not isinstance(num_cards, int) or num_cards < 1 or num_cards > 20:
-            return jsonify({"error": "num_cards must be between 1 and 20"}), 400
-
-        if difficulty not in ["easy", "medium", "hard"]:
-            return (
-                jsonify({"error": "difficulty must be 'easy', 'medium', or 'hard'"}),
-                400,
-            )
-
-        # Verify deck ownership
-        from services.crud_service import CRUDService
-
-        try:
-            CRUDService.get_one_deck(deck_id, user_id)
-        except ValueError:
-            return jsonify({"error": "Deck not found or access denied"}), 404
-
-        # Generate cards from text
-        result = ai_service.generate_cards_from_text(
-            content, num_cards, deck_id, difficulty
-        )
-
-        return (
-            jsonify(
-                {
-                    "message": f"Generated {len(result['data']['cards'])} flashcards successfully",
-                    "data": result["data"],
-                }
-            ),
-            200,
-        )
-
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-    except Exception as e:
-        return jsonify({"error": "Failed to generate flashcards"}), 500
-
-
-@bp_ai.route("/accept-cards", methods=["POST"])
-@jwt_required()
-def accept_generated_cards():
-    """
-    Accept and save AI-generated flashcards to deck.
-
-    Request Body:
-    {
-        "deck_id": 123,
-        "cards": [
-            {
-                "question": "What is...",
-                "answer": "It is...",
-                "difficulty_level": "medium"
-            }
-        ]
-    }
-
-    Returns:
-    - Saved card IDs
-    - Success confirmation
-    """
-    try:
-        user_id = get_jwt_identity()
-
-        if not request.is_json:
-            return jsonify({"error": "Request must be JSON"}), 400
-
-        data = request.get_json()
-
-        if "deck_id" not in data or "cards" not in data:
-            return jsonify({"error": "deck_id and cards are required"}), 400
-
-        deck_id = data["deck_id"]
-        cards = data["cards"]
-
-        if not isinstance(cards, list) or len(cards) == 0:
-            return jsonify({"error": "cards must be a non-empty list"}), 400
-
-        if len(cards) > 20:
-            return jsonify({"error": "Cannot save more than 20 cards at once"}), 400
-
-        # Verify deck ownership
-        from services.crud_service import CRUDService
-
-        try:
-            CRUDService.get_one_deck(deck_id, user_id)
-        except ValueError:
-            return jsonify({"error": "Deck not found or access denied"}), 404
-
-        # Save each card using CRUD service
-        saved_cards = []
-        failed_cards = []
-
-        for i, card_data in enumerate(cards):
-            try:
-                # Validate card data
-                required_fields = ["question", "answer", "difficulty_level"]
-                for field in required_fields:
-                    if field not in card_data or not card_data[field]:
-                        raise ValueError(f"Card {i+1}: {field} is required")
-
-                # Save card
-                result = CRUDService.add_new_card(card_data, deck_id, user_id)
-                saved_cards.append(
-                    {
-                        "index": i + 1,
-                        "card_id": result["data"]["id"],
-                        "question": result["data"]["question"],
-                    }
-                )
-
-            except Exception as e:
-                failed_cards.append(
-                    {
-                        "index": i + 1,
-                        "error": str(e),
-                        "question": card_data.get("question", "Unknown"),
-                    }
-                )
-
-        response_data = {
-            "saved_count": len(saved_cards),
-            "failed_count": len(failed_cards),
-            "saved_cards": saved_cards,
-        }
-
-        if failed_cards:
-            response_data["failed_cards"] = failed_cards
-
-        status_code = 201 if len(saved_cards) > 0 else 400
-        message = f"Saved {len(saved_cards)} cards successfully"
-        if failed_cards:
-            message += f", {len(failed_cards)} failed"
-
-        return jsonify({"message": message, "data": response_data}), status_code
-
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-    except Exception as e:
-        return jsonify({"error": "Failed to save generated cards"}), 500
 
 
 @bp_ai.route("/conversations", methods=["GET"])

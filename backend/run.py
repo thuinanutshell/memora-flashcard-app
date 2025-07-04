@@ -22,7 +22,7 @@ import click
 from flask.cli import with_appcontext
 from flask_migrate import init, migrate, upgrade, downgrade
 from app import create_app
-from app.jwt_model import db
+from models.base import db
 
 # Create app instance
 app = create_app()

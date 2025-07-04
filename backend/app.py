@@ -14,7 +14,14 @@ from routes.analytics import bp_analytics
 from routes.ai import bp_ai
 from services.auth_service import jwt_manager
 
-load_dotenv()
+env = os.getenv("FLASK_ENV", "development")
+if env == "development":
+    load_dotenv(".env.development")
+elif env == "production":
+    load_dotenv(".env.production")
+else:
+    load_dotenv()
+    
 migrate = Migrate()
 
 
