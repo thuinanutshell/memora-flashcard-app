@@ -9,6 +9,7 @@ from routes.auth import bp_auth
 from routes.folders import bp_folder
 from routes.cards import bp_card
 from routes.decks import bp_deck
+from routes.review import bp_review
 from routes.analytics import bp_analytics
 from routes.ai import bp_ai
 from services.auth_service import jwt_manager
@@ -53,11 +54,9 @@ def create_app(config_name=None):
     app.register_blueprint(bp_folder, url_prefix="/folder")
     app.register_blueprint(bp_deck, url_prefix="/deck")
     app.register_blueprint(bp_card, url_prefix="/card")
+    app.register_blueprint(bp_review, url_prefix="/review")
     app.register_blueprint(bp_analytics, url_prefix="/analytics")
     app.register_blueprint(bp_ai, url_prefix="/ai")
-
-    if not app.config.get("TESTING"):
-        migrate.init_app(app, db)
 
     @app.route("/", methods=["GET"])
     def index():
