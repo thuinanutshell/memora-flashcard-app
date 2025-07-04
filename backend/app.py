@@ -3,19 +3,33 @@ from dotenv import load_dotenv
 from flask import Flask
 from flask_migrate import Migrate
 from flask_cors import CORS, cross_origin
-from backend.models import db
-from backend.blueprints.bp_auth import auth_bp, jwt
-from backend.blueprints.bp_folder import folder_bp
-from backend.blueprints.bp_card import card_bp
-from backend.blueprints.bp_deck import deck_bp
-from backend.blueprints.bp_review import review_bp
-
+from models.base import db
+from routes.auth import bp_auth
+from routes.folders import bp_folder
+from routes.cards import bp_card
+from routes.decks import bp_deck
+from services.auth_service import jwt_manager
 
 load_dotenv()
 
 app = Flask(__name__)
-app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")
-app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("SQLALCHEMY_DATABASE_URI")
+config_map = {
+    "development": DevelopmentConfig,
+    "testing": TestingConfig,
+    "production": ProductionConfig,
+}
+
+# Handle None config safely
+config_name = config or os.getenv("FLASK_ENV", "development")
+config_class = config_map.get(config_name.lower(), DevelopmentConfig)
+app.config.from_object(config_class)
+
+# Initialize extensions
+jwt_manager.init_app(app)
+db.init_app(app)
+
+if not app.config.get("TESTING"):
+    migrate.init_app(app, db)
 
 # Set up CORS
 CORS(
@@ -27,7 +41,7 @@ CORS(
 )
 
 db.init_app(app)
-jwt.init_app(app)
+jwt_manager.init_app(app)
 migrate = Migrate(app, db)
 app.register_blueprint(auth_bp, url_prefix="/auth")
 app.register_blueprint(folder_bp, url_prefix="/folder")
