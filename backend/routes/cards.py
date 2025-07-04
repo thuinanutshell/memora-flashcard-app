@@ -2,10 +2,10 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from services.crud_service import CRUDService
 
-card_bp = Blueprint("card", __name__)
+bp_card = Blueprint("card", __name__)
 
 
-@card_bp.route("/<int:deck_id>", methods=["POST"])
+@bp_card.route("/<int:deck_id>", methods=["POST"])
 @jwt_required()
 def add_card(deck_id):
     # Verify ownership of the deck
@@ -18,7 +18,7 @@ def add_card(deck_id):
     )
 
 
-@card_bp.route("/<int:card_id>", methods=["GET"])
+@bp_card.route("/<int:card_id>", methods=["GET"])
 @jwt_required()
 def get_card(card_id):
     """Logic to get the information of a single card"""
@@ -30,7 +30,7 @@ def get_card(card_id):
     )
 
 
-@card_bp.route("/<int:card_id>", methods=["PATCH"])
+@bp_card.route("/<int:card_id>", methods=["PATCH"])
 @jwt_required()
 def update_card(card_id):
     current_user_id = get_jwt_identity()
@@ -42,7 +42,7 @@ def update_card(card_id):
     )
 
 
-@card_bp.route("/<int:card_id>", methods=["DELETE"])
+@bp_card.route("/<int:card_id>", methods=["DELETE"])
 @jwt_required()
 def delete_card(card_id):
     current_user_id = get_jwt_identity()

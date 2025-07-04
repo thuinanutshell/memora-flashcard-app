@@ -7,12 +7,14 @@ from models import db, User, Folder, Deck, Card, Review, AIConversation
 from config import DevelopmentConfig, TestingConfig, ProductionConfig
 from routes.auth import bp_auth
 from routes.folders import bp_folder
-from routes.cards import card_bp
+from routes.cards import bp_card
 from routes.decks import bp_deck
 from routes.analytics import bp_analytics
+from routes.ai import bp_ai
 from services.auth_service import jwt_manager
 
 load_dotenv()
+migrate = Migrate()
 
 
 def create_app(config_name=None):
@@ -50,22 +52,29 @@ def create_app(config_name=None):
     app.register_blueprint(bp_auth, url_prefix="/auth")
     app.register_blueprint(bp_folder, url_prefix="/folder")
     app.register_blueprint(bp_deck, url_prefix="/deck")
-    app.register_blueprint(card_bp, url_prefix="/card")
+    app.register_blueprint(bp_card, url_prefix="/card")
     app.register_blueprint(bp_analytics, url_prefix="/analytics")
+    app.register_blueprint(bp_ai, url_prefix="/ai")
 
-    # Create tables in app context
-    with app.app_context():
-        db.create_all()
+    if not app.config.get("TESTING"):
+        migrate.init_app(app, db)
 
     @app.route("/", methods=["GET"])
     def index():
         return {"message": "API is running!"}
 
+    @app.route("/health")
+    def health_check():
+        try:
+            from sqlalchemy import text
+
+            db.session.execute(text("SELECT 1"))
+            return {"status": "healthy", "database": "connected"}, 200
+        except Exception as e:
+            return {"status": "unhealthy", "error": str(e)}, 500
+
+    with app.app_context():
+        if app.config.get("TESTING"):
+            db.create_all()
+
     return app
-
-
-# For development
-app = create_app()
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001, debug=True)
