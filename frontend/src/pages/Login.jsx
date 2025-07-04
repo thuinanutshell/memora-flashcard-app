@@ -1,3 +1,11 @@
+import {
+  Box,
+  Center,
+  Container,
+  Stack,
+  Text,
+  Title
+} from '@mantine/core';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import LoginForm from '../components/auth/LoginForm';
@@ -17,10 +25,7 @@ const Login = () => {
       const result = await login(credentials);
       
       if (result.success) {
-        // The AuthContext will update the user state
-        // and the ProtectedRoute will handle the redirect
         console.log('Login successful, user:', result.user);
-        // Navigate programmatically as backup
         navigate('/dashboard', { replace: true });
       } else {
         setError(result.error);
@@ -34,25 +39,46 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 px-4">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        {/* Logo/Brand */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Memora</h1>
-          <p className="text-gray-600">AI-Powered Flashcard Learning</p>
-        </div>
+    <Box
+      style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '20px'
+      }}
+    >
+      <Container size={800}>
+        <Center mb={30}>
+          <Stack align="center" gap="md">
+            
+            <Stack align="center" gap={5}>
+              <Title
+                ta="center"
+                style={{
+                  background: 'linear-gradient(45deg, #fff, #e0e7ff)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  fontSize: '2.5rem',
+                  fontWeight: 900
+                }}
+              >
+                Memora
+              </Title>
+              <Text c="white" size="lg" fw={500} ta="center">
+                AI-Powered Flashcard Learning
+              </Text>
+              <Text c="gray.3" size="sm" ta="center" maw={300}>
+                Transform your study materials into interactive flashcards with the power of AI
+              </Text>
+            </Stack>
+          </Stack>
+        </Center>
 
-        {/* Error Message */}
-        {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-red-600 text-sm">{error}</p>
-          </div>
-        )}
-
-        {/* Login Form */}
-        <LoginForm onLogin={handleLogin} loading={loading} />
-      </div>
-    </div>
+        <LoginForm onLogin={handleLogin} loading={loading} error={error} />
+      </Container>
+    </Box>
   );
 };
 

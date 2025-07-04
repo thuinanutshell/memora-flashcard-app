@@ -1,3 +1,5 @@
+import { MantineProvider } from '@mantine/core';
+import '@mantine/core/styles.css';
 import { Navigate, Route, BrowserRouter as Router, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Dashboard from './pages/Dashboard';
@@ -100,9 +102,11 @@ function AppRoutes() {
 // Main App Component
 function App() {
   return (
-    <AuthProvider>
-      <AppRoutes />
-    </AuthProvider>
+    <MantineProvider>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
+    </MantineProvider>
   );
 }
 

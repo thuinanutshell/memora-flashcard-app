@@ -1,3 +1,14 @@
+import {
+  Box,
+  Center,
+  Grid,
+  Group,
+  Loader,
+  Paper,
+  Stack,
+  Text,
+  Title,
+} from '@mantine/core';
 import { Folder, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { folderService } from '../../services/folderService';
@@ -18,7 +29,7 @@ const FolderList = () => {
   const loadFolders = async () => {
     setLoading(true);
     setError('');
-    
+
     try {
       const result = await folderService.getAllFolders();
       if (result.success) {
@@ -46,70 +57,89 @@ const FolderList = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
+      <Center py="xl">
+        <Loader color="blue" />
+      </Center>
     );
   }
 
   if (error) {
     return (
-      <div className="text-center py-12">
-        <p className="text-red-600 mb-4">{error}</p>
-        <Button onClick={loadFolders}>Try Again</Button>
-      </div>
+      <Center py="xl">
+        <Stack align="center" spacing="sm">
+          <Text c="red.6">{error}</Text>
+          <Button onClick={loadFolders}>Try Again</Button>
+        </Stack>
+      </Center>
     );
   }
 
   return (
-    <div>
+    <Box>
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
+      <Group position="apart" mb="lg">
         <div>
-          <h2 className="text-xl font-bold text-gray-900">Your Folders</h2>
-          <p className="text-gray-600">Organize your study materials</p>
+          <Title order={2} size="lg" fw={700} c="gray.9">
+            Your Folders
+          </Title>
+          <Text c="gray.6">Organize your study materials</Text>
         </div>
-        <Button 
-          onClick={() => setShowCreateModal(true)}
-          className="flex items-center"
-        >
-          <Plus className="h-4 w-4 mr-2" />
+        <Button onClick={() => setShowCreateModal(true)} leftSection={<Plus size={16} />}>
           Create Folder
         </Button>
-      </div>
+      </Group>
 
       {/* Folders Grid */}
       {folders.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-lg border-2 border-dashed border-gray-300">
-          <Folder className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No folders yet</h3>
-          <p className="text-gray-600 mb-4">Create your first folder to get started</p>
-          <Button onClick={() => setShowCreateModal(true)}>
-            <Plus className="h-4 w-4 mr-2" />
+        <Paper
+          withBorder
+          radius="md"
+          py="xl"
+          px="md"
+          mt="sm"
+          c="gray.6"
+          ta="center"
+          style={{
+            borderStyle: 'dashed',
+            borderWidth: 2,
+            borderColor: '#d1d5db',
+          }}
+        >
+          <Center mb="md">
+            <Folder size={48} color="#9ca3af" />
+          </Center>
+          <Title order={4} fw={600} mb={6} c="gray.9">
+            No folders yet
+          </Title>
+          <Text size="sm" mb="md">
+            Create your first folder to get started
+          </Text>
+          <Button onClick={() => setShowCreateModal(true)} leftSection={<Plus size={16} />}>
             Create Your First Folder
           </Button>
-        </div>
+        </Paper>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <Grid gutter="lg">
           {folders.map(folder => (
-            <FolderCard
-              key={folder.id}
-              folder={folder}
-              onEdit={() => {/* TODO */}}
-              onDelete={() => {/* TODO */}}
-            />
+            <Grid.Col key={folder.id} span={{ base: 12, sm: 6, md: 4 }}>
+              <FolderCard
+                folder={folder}
+                onEdit={() => {/* TODO */}}
+                onDelete={() => {/* TODO */}}
+              />
+            </Grid.Col>
           ))}
-        </div>
+        </Grid>
       )}
 
-      {/* Create Folder Modal */}
+      {/* Modal */}
       {showCreateModal && (
         <CreateFolderModal
           onClose={() => setShowCreateModal(false)}
           onSubmit={handleCreateFolder}
         />
       )}
-    </div>
+    </Box>
   );
 };
 

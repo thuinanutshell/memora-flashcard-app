@@ -1,107 +1,72 @@
-import { useState } from 'react';
+import {
+  Alert,
+  Anchor,
+  Button,
+  Paper,
+  PasswordInput,
+  Stack,
+  Text,
+  TextInput,
+  Title
+} from '@mantine/core';
+import { useForm } from '@mantine/form';
+import { AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import Button from '../common/Button';
-import Input from '../common/Input';
 
-const LoginForm = ({ onLogin, loading = false }) => {
-  const [formData, setFormData] = useState({
-    identifier: '', // Username or email
-    password: ''
+const LoginForm = ({ onLogin, loading = false, error = '' }) => {
+  const form = useForm({
+    initialValues: {
+      identifier: '',
+      password: ''
+    },
+    validate: {
+      identifier: (value) => (!value ? 'Username or email is required' : null),
+      password: (value) => (!value ? 'Password is required' : null)
+    }
   });
-  const [errors, setErrors] = useState({});
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
-    }
-  };
-
-  const validateForm = () => {
-    const newErrors = {};
-    
-    if (!formData.identifier.trim()) {
-      newErrors.identifier = 'Username or email is required';
-    }
-    
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
-    
-    await onLogin(formData);
+  const handleSubmit = async (values) => {
+    await onLogin(values);
   };
 
   return (
-    <div className="w-full max-w-md mx-auto bg-white p-8 rounded-lg shadow-md">
-      <div className="text-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Welcome Back</h2>
-        <p className="text-gray-600 mt-2">Sign in to your account</p>
-      </div>
+    <Paper shadow="md" p={30} mt={30} radius="md" withBorder>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <Input
-          label="Username or Email"
-          name="identifier"
-          value={formData.identifier}
-          onChange={handleChange}
-          error={errors.identifier}
-          placeholder="Enter your username or email"
-          required
-        />
+      {error && (
+        <Alert icon={<AlertCircle size="1rem" />} color="red" mb="md">
+          {error}
+        </Alert>
+      )}
 
-        <Input
-          label="Password"
-          name="password"
-          type="password"
-          value={formData.password}
-          onChange={handleChange}
-          error={errors.password}
-          placeholder="Enter your password"
-          required
-        />
+      <form onSubmit={form.onSubmit(handleSubmit)}>
+        <Stack>
+          <TextInput
+            label="Username or Email"
+            placeholder="Enter your username or email"
+            required
+            {...form.getInputProps('identifier')}
+          />
 
-        <Button
-          type="submit"
-          className="w-full"
-          loading={loading}
-          disabled={loading}
-        >
-          Sign In
-        </Button>
+          <PasswordInput
+            label="Password"
+            placeholder="Enter your password"
+            required
+            {...form.getInputProps('password')}
+          />
 
-        <div className="text-center mt-4">
-          <p className="text-sm text-gray-600">
-            Don't have an account?{' '}
-            <Link 
-              to="/register" 
-              className="text-blue-600 hover:text-blue-500 font-medium"
-            >
-              Create one here
-            </Link>
-          </p>
-        </div>
+          <Button type="submit" fullWidth mt="xl" loading={loading}>
+            Sign In
+          </Button>
+        </Stack>
       </form>
-    </div>
+
+      <Text c="dimmed" size="sm" ta="center" mt={30}>
+        Don't have an account?{' '}
+        <Anchor component={Link} to="/register" size="sm">
+          Create one here
+        </Anchor>
+      </Text>
+    </Paper>
   );
 };
 

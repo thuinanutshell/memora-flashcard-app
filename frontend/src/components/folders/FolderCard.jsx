@@ -1,3 +1,11 @@
+import {
+  Box,
+  Group,
+  Paper,
+  Stack,
+  Text,
+  UnstyledButton,
+} from '@mantine/core';
 import { BookOpen, Folder, MoreVertical } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -9,45 +17,63 @@ const FolderCard = ({ folder, onEdit, onDelete }) => {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow cursor-pointer">
-      <div onClick={handleClick}>
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Folder className="h-6 w-6 text-blue-600" />
-            </div>
-            <div className="ml-3">
-              <h3 className="text-lg font-semibold text-gray-900">{folder.name}</h3>
-              {folder.description && (
-                <p className="text-sm text-gray-600 mt-1">{folder.description}</p>
-              )}
-            </div>
-          </div>
-          
-          <div className="relative">
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                // TODO: Show dropdown menu
-              }}
-              className="p-1 hover:bg-gray-100 rounded"
-            >
-              <MoreVertical className="h-4 w-4 text-gray-400" />
-            </button>
-          </div>
-        </div>
-        
-        <div className="flex items-center justify-between text-sm text-gray-500">
-          <div className="flex items-center">
-            <BookOpen className="h-4 w-4 mr-1" />
-            <span>{folder.deckCount || 0} decks</span>
-          </div>
-          <div>
-            <span>{folder.cardCount || 0} cards</span>
-          </div>
-        </div>
-      </div>
-    </div>
+    <Paper
+      withBorder
+      radius="md"
+      shadow="sm"
+      p="md"
+      onClick={handleClick}
+      sx={(theme) => ({
+        transition: 'box-shadow 150ms ease, transform 150ms ease',
+        cursor: 'pointer',
+        '&:hover': {
+          boxShadow: theme.shadows.md,
+        },
+      })}
+    >
+      <Group position="apart" mb="sm" align="flex-start">
+        <Group align="flex-start" spacing="sm">
+          <Box bg="blue.1" p="xs" radius="md">
+            <Folder size={20} color="#2563eb" />
+          </Box>
+          <Stack spacing={2}>
+            <Text fw={600} size="md" c="gray.9">
+              {folder.name}
+            </Text>
+            {folder.description && (
+              <Text size="sm" c="gray.6">
+                {folder.description}
+              </Text>
+            )}
+          </Stack>
+        </Group>
+
+        <UnstyledButton
+          onClick={(e) => {
+            e.stopPropagation();
+            // TODO: Show dropdown menu
+          }}
+          px={4}
+          py={2}
+          sx={(theme) => ({
+            borderRadius: theme.radius.sm,
+            '&:hover': {
+              backgroundColor: theme.colors.gray[1],
+            },
+          })}
+        >
+          <MoreVertical size={16} color="#9ca3af" />
+        </UnstyledButton>
+      </Group>
+
+      <Group position="apart" mt="xs" c="gray.6" fz="sm">
+        <Group spacing={4}>
+          <BookOpen size={14} />
+          <Text>{folder.deckCount || 0} decks</Text>
+        </Group>
+        <Text>{folder.cardCount || 0} cards</Text>
+      </Group>
+    </Paper>
   );
 };
 

@@ -1,169 +1,159 @@
-import { useState } from 'react';
+// RegisterForm.jsx
+import {
+  Alert,
+  Anchor,
+  Box,
+  Button,
+  Container,
+  Group,
+  Paper,
+  PasswordInput,
+  Progress,
+  Stack,
+  Text,
+  TextInput
+} from '@mantine/core';
+import { useForm } from '@mantine/form';
+import { AlertCircle, Check, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import Button from '../common/Button';
-import Input from '../common/Input';
 
-const RegisterForm = ({ onRegister, loading = false }) => {
-  const [formData, setFormData] = useState({
-    full_name: '',
-    username: '',
-    email: '',
-    password: '',
-    confirmPassword: ''
+const RegisterForm = ({ onRegister, loading = false, error = '' }) => {
+  const form = useForm({
+    initialValues: {
+      full_name: '',
+      username: '',
+      email: '',
+      password: '',
+      confirmPassword: ''
+    },
+    validate: {
+      full_name: (value) => (!value ? 'Full name is required' : null),
+      username: (value) => {
+        if (!value) return 'Username is required';
+        if (value.length < 3) return 'Username must be at least 3 characters';
+        return null;
+      },
+      email: (value) => {
+        if (!value) return 'Email is required';
+        return /^\S+@\S+$/.test(value) ? null : 'Invalid email';
+      },
+      password: (value) => {
+        if (!value) return 'Password is required';
+        if (value.length < 8) return 'Password must be at least 8 characters';
+        return null;
+      },
+      confirmPassword: (value, values) => 
+        value !== values.password ? 'Passwords did not match' : null
+    }
   });
-  const [errors, setErrors] = useState({});
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
-    }
+  const getPasswordStrength = (password) => {
+    let strength = 0;
+    if (password.length >= 8) strength += 25;
+    if (/[A-Z]/.test(password)) strength += 25;
+    if (/[0-9]/.test(password)) strength += 25;
+    if (/[^A-Za-z0-9]/.test(password)) strength += 25;
+    return strength;
   };
 
-  const validateForm = () => {
-    const newErrors = {};
-    
-    // Full name validation
-    if (!formData.full_name.trim()) {
-      newErrors.full_name = 'Full name is required';
-    }
-    
-    // Username validation
-    if (!formData.username.trim()) {
-      newErrors.username = 'Username is required';
-    } else if (formData.username.length < 3) {
-      newErrors.username = 'Username must be at least 3 characters';
-    }
-    
-    // Email validation
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email address';
-    }
-    
-    // Password validation
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 8) {
-      newErrors.password = 'Password must be at least 8 characters';
-    }
-    
-    // Confirm password validation
-    if (!formData.confirmPassword) {
-      newErrors.confirmPassword = 'Please confirm your password';
-    } else if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+  const passwordStrength = getPasswordStrength(form.values.password);
+  const strengthColor = passwordStrength < 50 ? 'red' : passwordStrength < 80 ? 'yellow' : 'teal';
+  const strengthLabel = passwordStrength < 50 ? 'Weak' : passwordStrength < 80 ? 'Fair' : 'Strong';
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
-    
-    // Remove confirmPassword before sending to API
-    const { confirmPassword, ...userData } = formData;
+  const requirements = [
+    { re: /.{8,}/, label: 'At least 8 characters' },
+    { re: /[0-9]/, label: 'Includes number' },
+    { re: /[a-z]/, label: 'Includes lowercase letter' },
+    { re: /[A-Z]/, label: 'Includes uppercase letter' },
+  ];
+
+  const checks = requirements.map((requirement, index) => (
+    <Box key={index} c={requirement.re.test(form.values.password) ? 'teal' : 'red'} mt={5}>
+      <Group gap={5}>
+        {requirement.re.test(form.values.password) ? <Check size="0.9rem" /> : <X size="0.9rem" />}
+        <Text size="sm">{requirement.label}</Text>
+      </Group>
+    </Box>
+  ));
+
+  const handleSubmit = async (values) => {
+    const { confirmPassword, ...userData } = values;
     await onRegister(userData);
   };
 
   return (
-    <div className="w-full max-w-md mx-auto bg-white p-8 rounded-lg shadow-md">
-      <div className="text-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Create Account</h2>
-        <p className="text-gray-600 mt-2">Join us to start learning</p>
-      </div>
+    <Container size={800}>
+      <Paper shadow="lg" p="xl" radius="sm" withBorder>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <Input
-          label="Full Name"
-          name="full_name"
-          value={formData.full_name}
-          onChange={handleChange}
-          error={errors.full_name}
-          placeholder="Enter your full name"
-          required
-        />
+        {error && (
+          <Alert icon={<AlertCircle size="1rem" />} color="red" mb="md">
+            {error}
+          </Alert>
+        )}
 
-        <Input
-          label="Username"
-          name="username"
-          value={formData.username}
-          onChange={handleChange}
-          error={errors.username}
-          placeholder="Choose a username"
-          required
-        />
+        <form onSubmit={form.onSubmit(handleSubmit)}>
+          <Stack spacing="md">
+            <TextInput
+              label="Full Name"
+              placeholder="Enter your full name"
+              required
+              {...form.getInputProps('full_name')}
+            />
 
-        <Input
-          label="Email"
-          name="email"
-          type="email"
-          value={formData.email}
-          onChange={handleChange}
-          error={errors.email}
-          placeholder="Enter your email"
-          required
-        />
+            <TextInput
+              label="Username"
+              placeholder="Choose a username"
+              required
+              {...form.getInputProps('username')}
+            />
 
-        <Input
-          label="Password"
-          name="password"
-          type="password"
-          value={formData.password}
-          onChange={handleChange}
-          error={errors.password}
-          placeholder="Create a password"
-          required
-        />
+            <TextInput
+              label="Email"
+              placeholder="Enter your email"
+              required
+              {...form.getInputProps('email')}
+            />
 
-        <Input
-          label="Confirm Password"
-          name="confirmPassword"
-          type="password"
-          value={formData.confirmPassword}
-          onChange={handleChange}
-          error={errors.confirmPassword}
-          placeholder="Confirm your password"
-          required
-        />
+            <Box>
+              <PasswordInput
+                label="Password"
+                placeholder="Create a password"
+                required
+                {...form.getInputProps('password')}
+              />
 
-        <Button
-          type="submit"
-          className="w-full"
-          loading={loading}
-          disabled={loading}
-        >
-          Create Account
-        </Button>
+              {form.values.password && (
+                <Box mt="xs">
+                  <Progress color={strengthColor} value={passwordStrength} size={5} />
+                  <Text size="xs" c="dimmed" mt={5}>
+                    Password strength: {strengthLabel}
+                  </Text>
+                  {checks}
+                </Box>
+              )}
+            </Box>
 
-        <div className="text-center mt-4">
-          <p className="text-sm text-gray-600">
-            Already have an account?{' '}
-            <Link 
-              to="/login" 
-              className="text-blue-600 hover:text-blue-500 font-medium"
-            >
-              Sign in here
-            </Link>
-          </p>
-        </div>
-      </form>
-    </div>
+            <PasswordInput
+              label="Confirm Password"
+              placeholder="Confirm your password"
+              required
+              {...form.getInputProps('confirmPassword')}
+            />
+
+            <Button type="submit" fullWidth mt="xl" radius="md" variant="filled" loading={loading}>
+              Create Account
+            </Button>
+          </Stack>
+        </form>
+
+        <Text color="gray.6" size="sm" ta="center" mt={30}>
+          Already have an account?{' '}
+          <Anchor component={Link} to="/login" size="sm">
+            Sign in here
+          </Anchor>
+        </Text>
+      </Paper>
+    </Container>
   );
 };
 
