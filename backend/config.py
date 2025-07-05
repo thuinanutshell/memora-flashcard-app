@@ -26,16 +26,22 @@ class DevelopmentConfig(BaseConfig):
 class ProductionConfig(BaseConfig):
     DEBUG = False
     TESTING = False
-    SQLALCHEMY_DATABASE_URI = os.getenv("PROD_DATABASE_URI", "sqlite:///production.db")
+    # Railway provides DATABASE_URL automatically
+    SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL") or os.getenv(
+        "PROD_DATABASE_URI", "sqlite:///production.db"
+    )
     JWT_SECRET_KEY = os.getenv("PROD_JWT_SECRET_KEY")
-    REDIS_URL = os.getenv("PROD_REDIS_URL", "redis://localhost:6379/0")
+    # Railway provides REDIS_URL automatically
+    REDIS_URL = os.getenv("REDIS_URL") or os.getenv(
+        "PROD_REDIS_URL", "redis://localhost:6379/0"
+    )
 
     @classmethod
     def init_app(cls, app):
         BaseConfig.init_app(app)
 
         # Validate critical production settings
-        required_vars = ["PROD_JWT_SECRET_KEY", "PROD_DATABASE_URI"]
+        required_vars = ["PROD_JWT_SECRET_KEY"]
         missing = [var for var in required_vars if not os.getenv(var)]
         if missing:
             raise ValueError(
