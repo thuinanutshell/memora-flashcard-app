@@ -1,12 +1,12 @@
 import {
-  Box,
+  ActionIcon,
+  Card,
   Group,
-  Paper,
   Stack,
   Text,
-  UnstyledButton,
+  ThemeIcon,
 } from '@mantine/core';
-import { BookOpen, Folder, MoreVertical } from 'lucide-react';
+import { BookOpen, Edit, Folder, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const FolderCard = ({ folder, onEdit, onDelete }) => {
@@ -16,64 +16,72 @@ const FolderCard = ({ folder, onEdit, onDelete }) => {
     navigate(`/folder/${folder.id}`);
   };
 
+  const handleEdit = (e) => {
+    e.stopPropagation();
+    onEdit?.(folder);
+  };
+
+  const handleDelete = (e) => {
+    e.stopPropagation();
+    onDelete?.(folder);
+  };
+
   return (
-    <Paper
+    <Card
       withBorder
-      radius="md"
       shadow="sm"
-      p="md"
+      padding="md"
+      radius="md"
+      style={{ cursor: 'pointer' }}
       onClick={handleClick}
-      sx={(theme) => ({
-        transition: 'box-shadow 150ms ease, transform 150ms ease',
-        cursor: 'pointer',
-        '&:hover': {
-          boxShadow: theme.shadows.md,
-        },
-      })}
     >
-      <Group position="apart" mb="sm" align="flex-start">
-        <Group align="flex-start" spacing="sm">
-          <Box bg="blue.1" p="xs" radius="md">
-            <Folder size={20} color="#2563eb" />
-          </Box>
-          <Stack spacing={2}>
-            <Text fw={600} size="md" c="gray.9">
-              {folder.name}
-            </Text>
+      <Group justify="space-between" align="flex-start" mb="md">
+        <Group align="flex-start">
+          <ThemeIcon size="lg" variant="light" color="blue">
+            <Folder size={20} />
+          </ThemeIcon>
+          
+          <Stack gap={4}>
+            <Group gap="xs" align="center">
+              <Text fw={600} size="md">
+                {folder.name}
+              </Text>
+              <Group gap={4}>
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  size="sm"
+                  onClick={handleEdit}
+                >
+                  <Edit size={14} />
+                </ActionIcon>
+                <ActionIcon
+                  variant="subtle"
+                  color="red"
+                  size="sm"
+                  onClick={handleDelete}
+                >
+                  <Trash2 size={14} />
+                </ActionIcon>
+              </Group>
+            </Group>
             {folder.description && (
-              <Text size="sm" c="gray.6">
+              <Text size="sm" c="dimmed" lineClamp={2}>
                 {folder.description}
               </Text>
             )}
           </Stack>
         </Group>
-
-        <UnstyledButton
-          onClick={(e) => {
-            e.stopPropagation();
-            // TODO: Show dropdown menu
-          }}
-          px={4}
-          py={2}
-          sx={(theme) => ({
-            borderRadius: theme.radius.sm,
-            '&:hover': {
-              backgroundColor: theme.colors.gray[1],
-            },
-          })}
-        >
-          <MoreVertical size={16} color="#9ca3af" />
-        </UnstyledButton>
       </Group>
 
-      <Group position="apart" mt="xs" c="gray.6" fz="sm">
-        <Group spacing={4}>
+      <Group justify="space-between" c="dimmed" fz="sm">
+        <Group gap={4}>
           <BookOpen size={14} />
           <Text>{folder.deckCount || 0} decks</Text>
         </Group>
         <Text>{folder.cardCount || 0} cards</Text>
       </Group>
-    </Paper>
+    </Card>
   );
 };
 

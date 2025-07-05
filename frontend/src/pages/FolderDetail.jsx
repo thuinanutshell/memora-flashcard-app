@@ -1,15 +1,24 @@
-import { ArrowLeft, Folder } from 'lucide-react';
+import {
+  Alert,
+  Box,
+  Button,
+  Center,
+  Divider,
+  Group,
+  Loader,
+  Stack,
+  Text,
+  ThemeIcon,
+  Title,
+} from '@mantine/core';
+import { AlertCircle, Folder } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import Button from '../components/common/Button';
+import { useParams } from 'react-router-dom';
 import DeckList from '../components/decks/DeckList';
-import { useAuth } from '../context/AuthContext';
 import { deckService } from '../services/deckService';
 
 const FolderDetail = () => {
   const { folderId } = useParams();
-  const navigate = useNavigate();
-  const { user, logout } = useAuth();
   
   const [folder, setFolder] = useState(null);
   const [decks, setDecks] = useState([]);
@@ -39,11 +48,6 @@ const FolderDetail = () => {
     }
   };
 
-  const handleLogout = async () => {
-    await logout();
-    navigate('/login');
-  };
-
   const handleCreateDeck = async (deckData) => {
     const result = await deckService.createDeck(folderId, deckData);
     if (result.success) {
@@ -56,89 +60,82 @@ const FolderDetail = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <p className="ml-2">Loading folder...</p>
-        </div>
-      </div>
+      <Center style={{ minHeight: '60vh' }}>
+        <Stack align="center" gap="md">
+          <Loader color="blue" size="lg" />
+          <Text c="dimmed">Loading folder...</Text>
+        </Stack>
+      </Center>
     );
   }
 
-  if (error) {
+  if (error && !folder) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="text-center py-12">
-          <p className="text-red-600 mb-4">{error}</p>
-          <Button onClick={() => navigate('/dashboard')}>Back to Dashboard</Button>
-        </div>
-      </div>
+      <Center style={{ minHeight: '60vh' }}>
+        <Stack align="center" gap="md">
+          <Alert
+            icon={<AlertCircle size={16} />}
+            color="red"
+            title="Error"
+            style={{ maxWidth: 400 }}
+          >
+            {error}
+          </Alert>
+          <Button variant="light" onClick={loadFolderAndDecks}>
+            Try Again
+          </Button>
+        </Stack>
+      </Center>
     );
   }
+
+  const totalCards = decks.reduce((total, deck) => total + (deck.card_count || 0), 0);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            {/* Navigation */}
-            <div className="flex items-center">
-              <button
-                onClick={() => navigate('/dashboard')}
-                className="flex items-center text-gray-600 hover:text-gray-900 mr-4"
-              >
-                <ArrowLeft className="h-5 w-5 mr-1" />
-                Back
-              </button>
-              <h1 className="text-xl font-bold text-gray-900">Memora</h1>
-            </div>
+    <Box>
+      {/* Error Alert */}
+      {error && (
+        <Alert
+          icon={<AlertCircle size={16} />}
+          color="red"
+          mb="lg"
+          withCloseButton
+          onClose={() => setError('')}
+        >
+          {error}
+        </Alert>
+      )}
 
-            {/* User Menu */}
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">
-                Welcome, {user?.full_name}
-              </span>
-              <Button variant="outline" onClick={handleLogout}>
-                Sign Out
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Folder Header */}
-        <div className="mb-8">
-          <div className="flex items-center mb-4">
-            <div className="p-3 bg-blue-100 rounded-lg mr-4">
-              <Folder className="h-8 w-8 text-blue-600" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">{folder?.name}</h2>
-              {folder?.description && (
-                <p className="text-gray-600 mt-1">{folder.description}</p>
-              )}
-            </div>
-          </div>
+      {/* Folder Header */}
+      <Box mb="xl">
+        <Group align="flex-start" mb="md">
+          <ThemeIcon size="xl" variant="light" color="blue">
+            <Folder size={28} />
+          </ThemeIcon>
           
-          {/* Folder Stats */}
-          <div className="flex items-center space-x-6 text-sm text-gray-600">
-            <span>{decks.length} decks</span>
-            <span>{decks.reduce((total, deck) => total + (deck.card_count || 0), 0)} cards</span>
-          </div>
-        </div>
+          <Stack gap={4}>
+            <Title order={1} size="h2">
+              {folder?.name}
+            </Title>
+            {folder?.description && (
+              <Text c="dimmed" size="md">
+                {folder.description}
+              </Text>
+            )}
+          </Stack>
+        </Group>
+      </Box>
 
-        {/* Deck Management */}
-        <DeckList 
-          folderId={folderId}
-          decks={decks}
-          onCreateDeck={handleCreateDeck}
-          onDeckUpdate={loadFolderAndDecks}
-        />
-      </main>
-    </div>
+      <Divider mb="xl" />
+
+      {/* Deck Management */}
+      <DeckList 
+        folderId={folderId}
+        decks={decks}
+        onCreateDeck={handleCreateDeck}
+        onDeckUpdate={loadFolderAndDecks}
+      />
+    </Box>
   );
 };
 

@@ -1,6 +1,17 @@
+import {
+  Box,
+  Button,
+  Card,
+  Center,
+  Group,
+  SimpleGrid,
+  Stack,
+  Text,
+  ThemeIcon,
+  Title,
+} from '@mantine/core';
 import { BookOpen, Plus } from 'lucide-react';
 import { useState } from 'react';
-import Button from '../common/Button';
 import CreateDeckModal from './CreateDeckModal';
 import DeckCard from './DeckCard';
 
@@ -17,43 +28,87 @@ const DeckList = ({ folderId, decks, onCreateDeck, onDeckUpdate }) => {
     }
   };
 
+  const handleEditDeck = (deck) => {
+    // TODO: Implement edit functionality
+    console.log('Edit deck:', deck);
+  };
+
+  const handleDeleteDeck = async (deck) => {
+    if (window.confirm(`Are you sure you want to delete "${deck.name}"?`)) {
+      // TODO: Implement delete functionality
+      console.log('Delete deck:', deck);
+      // After successful deletion, call onDeckUpdate to refresh the list
+      // onDeckUpdate?.();
+    }
+  };
+
   return (
-    <div>
+    <Box>
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h3 className="text-xl font-bold text-gray-900">Decks</h3>
-          <p className="text-gray-600">Study decks in this folder</p>
-        </div>
+      <Group justify="space-between" mb="lg">
+        <Stack gap={4}>
+          <Title order={3} size="h4">
+            Decks
+          </Title>
+          <Text c="dimmed" size="sm">
+            Study decks in this folder
+          </Text>
+        </Stack>
+        
         <Button 
+          leftSection={<Plus size={16} />}
           onClick={() => setShowCreateModal(true)}
-          className="flex items-center"
         >
-          <Plus className="h-4 w-4 mr-2" />
           Create Deck
         </Button>
-      </div>
+      </Group>
 
       {/* Decks Grid */}
       {decks.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-lg border-2 border-dashed border-gray-300">
-          <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h4 className="text-lg font-medium text-gray-900 mb-2">No decks yet</h4>
-          <p className="text-gray-600 mb-4">Create your first deck to start adding cards</p>
-          <Button onClick={() => setShowCreateModal(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Create Your First Deck
-          </Button>
-        </div>
+        <Card
+          withBorder
+          padding="xl"
+          radius="md"
+          style={{ borderStyle: 'dashed' }}
+        >
+          <Center>
+            <Stack align="center" gap="md">
+              <ThemeIcon size={60} variant="light" color="green">
+                <BookOpen size={30} />
+              </ThemeIcon>
+              
+              <Stack align="center" gap="xs">
+                <Title order={4} c="dimmed">
+                  No decks yet
+                </Title>
+                <Text size="sm" c="dimmed" ta="center">
+                  Create your first deck to start adding flashcards
+                </Text>
+              </Stack>
+              
+              <Button 
+                leftSection={<Plus size={16} />}
+                onClick={() => setShowCreateModal(true)}
+              >
+                Create Your First Deck
+              </Button>
+            </Stack>
+          </Center>
+        </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <SimpleGrid
+          cols={{ base: 1, sm: 2, lg: 3 }}
+          spacing="lg"
+        >
           {decks.map(deck => (
             <DeckCard
               key={deck.id}
               deck={deck}
+              onEdit={handleEditDeck}
+              onDelete={handleDeleteDeck}
             />
           ))}
-        </div>
+        </SimpleGrid>
       )}
 
       {/* Create Deck Modal */}
@@ -63,7 +118,7 @@ const DeckList = ({ folderId, decks, onCreateDeck, onDeckUpdate }) => {
           onSubmit={handleCreateDeck}
         />
       )}
-    </div>
+    </Box>
   );
 };
 

@@ -1,18 +1,19 @@
 import {
   Box,
+  Button,
+  Card,
   Center,
-  Grid,
   Group,
   Loader,
-  Paper,
+  SimpleGrid,
   Stack,
   Text,
+  ThemeIcon,
   Title,
 } from '@mantine/core';
 import { Folder, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { folderService } from '../../services/folderService';
-import Button from '../common/Button';
 import CreateFolderModal from './CreateFolderModal';
 import FolderCard from './FolderCard';
 
@@ -55,10 +56,29 @@ const FolderList = () => {
     }
   };
 
+  const handleEditFolder = (folder) => {
+    // TODO: Implement edit functionality
+    console.log('Edit folder:', folder);
+  };
+
+  const handleDeleteFolder = async (folder) => {
+    if (window.confirm(`Are you sure you want to delete "${folder.name}"?`)) {
+      const result = await folderService.deleteFolder(folder.id);
+      if (result.success) {
+        setFolders(prev => prev.filter(f => f.id !== folder.id));
+      } else {
+        setError(result.error);
+      }
+    }
+  };
+
   if (loading) {
     return (
       <Center py="xl">
-        <Loader color="blue" />
+        <Stack align="center" gap="md">
+          <Loader color="blue" />
+          <Text c="dimmed">Loading folders...</Text>
+        </Stack>
       </Center>
     );
   }
@@ -66,9 +86,11 @@ const FolderList = () => {
   if (error) {
     return (
       <Center py="xl">
-        <Stack align="center" spacing="sm">
-          <Text c="red.6">{error}</Text>
-          <Button onClick={loadFolders}>Try Again</Button>
+        <Stack align="center" gap="md">
+          <Text c="red">{error}</Text>
+          <Button variant="light" onClick={loadFolders}>
+            Try Again
+          </Button>
         </Stack>
       </Center>
     );
@@ -77,62 +99,73 @@ const FolderList = () => {
   return (
     <Box>
       {/* Header */}
-      <Group position="apart" mb="lg">
-        <div>
-          <Title order={2} size="lg" fw={700} c="gray.9">
+      <Group justify="space-between" mb="lg">
+        <Stack gap={4}>
+          <Title order={2} size="h3">
             Your Folders
           </Title>
-          <Text c="gray.6">Organize your study materials</Text>
-        </div>
-        <Button onClick={() => setShowCreateModal(true)} leftSection={<Plus size={16} />}>
+          <Text c="dimmed" size="sm">
+            Organize your study materials
+          </Text>
+        </Stack>
+        
+        <Button 
+          leftSection={<Plus size={16} />}
+          onClick={() => setShowCreateModal(true)}
+        >
           Create Folder
         </Button>
       </Group>
 
       {/* Folders Grid */}
       {folders.length === 0 ? (
-        <Paper
+        <Card
           withBorder
+          padding="xl"
           radius="md"
-          py="xl"
-          px="md"
-          mt="sm"
-          c="gray.6"
-          ta="center"
-          style={{
-            borderStyle: 'dashed',
-            borderWidth: 2,
-            borderColor: '#d1d5db',
-          }}
+          style={{ borderStyle: 'dashed' }}
         >
-          <Center mb="md">
-            <Folder size={48} color="#9ca3af" />
+          <Center>
+            <Stack align="center" gap="md">
+              <ThemeIcon size={60} variant="light" color="gray">
+                <Folder size={30} />
+              </ThemeIcon>
+              
+              <Stack align="center" gap="xs">
+                <Title order={4} c="dimmed">
+                  No folders yet
+                </Title>
+                <Text size="sm" c="dimmed" ta="center">
+                  Create your first folder to get started organizing your study materials
+                </Text>
+              </Stack>
+              
+              <Button 
+                leftSection={<Plus size={16} />}
+                onClick={() => setShowCreateModal(true)}
+              >
+                Create Your First Folder
+              </Button>
+            </Stack>
           </Center>
-          <Title order={4} fw={600} mb={6} c="gray.9">
-            No folders yet
-          </Title>
-          <Text size="sm" mb="md">
-            Create your first folder to get started
-          </Text>
-          <Button onClick={() => setShowCreateModal(true)} leftSection={<Plus size={16} />}>
-            Create Your First Folder
-          </Button>
-        </Paper>
+        </Card>
       ) : (
-        <Grid gutter="lg">
+        <SimpleGrid
+          cols={{ base: 1, sm: 2, lg: 3 }}
+          spacing="lg"
+        >
           {folders.map(folder => (
-            <Grid.Col key={folder.id} span={{ base: 12, sm: 6, md: 4 }}>
-              <FolderCard
-                folder={folder}
-                onEdit={() => {/* TODO */}}
-                onDelete={() => {/* TODO */}}
-              />
-            </Grid.Col>
+            <FolderCard
+              key={folder.id}
+              folder={folder}
+              onEdit={handleEditFolder}
+              onDelete={handleDeleteFolder}
+            />
           ))}
-        </Grid>
+        </SimpleGrid>
       )}
 
-      {/* Modal */}
+      {/* Create Folder Modal */}
       {showCreateModal && (
         <CreateFolderModal
           onClose={() => setShowCreateModal(false)}

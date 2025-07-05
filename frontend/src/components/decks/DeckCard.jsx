@@ -1,56 +1,98 @@
-import { BookOpen, FileText, MoreVertical } from 'lucide-react';
+import {
+  ActionIcon,
+  Badge,
+  Card,
+  Group,
+  Stack,
+  Text,
+  ThemeIcon,
+} from '@mantine/core';
+import { BookOpen, Edit, FileText, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-const DeckCard = ({ deck }) => {
+const DeckCard = ({ deck, onEdit, onDelete }) => {
   const navigate = useNavigate();
 
   const handleClick = () => {
     navigate(`/deck/${deck.id}`);
   };
 
+  const handleEdit = (e) => {
+    e.stopPropagation();
+    onEdit?.(deck);
+  };
+
+  const handleDelete = (e) => {
+    e.stopPropagation();
+    onDelete?.(deck);
+  };
+
+  const cardCount = deck.card_count || 0;
+  const isEmpty = cardCount === 0;
+
   return (
-    <div 
-      className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow cursor-pointer"
+    <Card
+      withBorder
+      shadow="sm"
+      padding="md"
+      radius="md"
+      style={{ cursor: 'pointer' }}
       onClick={handleClick}
     >
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center">
-          <div className="p-2 bg-green-100 rounded-lg">
-            <BookOpen className="h-6 w-6 text-green-600" />
-          </div>
-          <div className="ml-3">
-            <h3 className="text-lg font-semibold text-gray-900">{deck.name}</h3>
+      <Group justify="space-between" align="flex-start" mb="md">
+        <Group align="flex-start">
+          <ThemeIcon size="lg" variant="light" color="green">
+            <BookOpen size={20} />
+          </ThemeIcon>
+          
+          <Stack gap={4}>
+            <Group gap="xs" align="center">
+              <Text fw={600} size="md">
+                {deck.name}
+              </Text>
+              <Group gap={4}>
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  size="sm"
+                  onClick={handleEdit}
+                >
+                  <Edit size={14} />
+                </ActionIcon>
+                <ActionIcon
+                  variant="subtle"
+                  color="red"
+                  size="sm"
+                  onClick={handleDelete}
+                >
+                  <Trash2 size={14} />
+                </ActionIcon>
+              </Group>
+            </Group>
             {deck.description && (
-              <p className="text-sm text-gray-600 mt-1">{deck.description}</p>
+              <Text size="sm" c="dimmed" lineClamp={2}>
+                {deck.description}
+              </Text>
             )}
-          </div>
-        </div>
+          </Stack>
+        </Group>
+      </Group>
+
+      <Group justify="space-between" align="center">
+        <Group gap={4} c="dimmed" fz="sm">
+          <FileText size={14} />
+          <Text>{cardCount} cards</Text>
+        </Group>
         
-        <div className="relative">
-          <button 
-            onClick={(e) => {
-              e.stopPropagation();
-              console.log('More options clicked for deck:', deck.name);
-            }}
-            className="p-1 hover:bg-gray-100 rounded"
-          >
-            <MoreVertical className="h-4 w-4 text-gray-400" />
-          </button>
-        </div>
-      </div>
-      
-      <div className="flex items-center justify-between text-sm text-gray-500">
-        <div className="flex items-center">
-          <FileText className="h-4 w-4 mr-1" />
-          <span>{deck.card_count || 0} cards</span>
-        </div>
-        <div>
-          <span className="text-xs bg-gray-100 px-2 py-1 rounded">
-            {deck.card_count > 0 ? 'Active' : 'Empty'}
-          </span>
-        </div>
-      </div>
-    </div>
+        <Badge 
+          variant="light" 
+          color={isEmpty ? 'gray' : 'blue'}
+          size="sm"
+        >
+          {isEmpty ? 'Empty' : 'Active'}
+        </Badge>
+      </Group>
+    </Card>
   );
 };
 

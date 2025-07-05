@@ -1,6 +1,7 @@
 import { MantineProvider } from '@mantine/core';
 import '@mantine/core/styles.css';
 import { Navigate, Route, BrowserRouter as Router, Routes } from 'react-router-dom';
+import ProtectedRoute from './components/common/ProtectedRoute';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Dashboard from './pages/Dashboard';
 import DeckDetail from './pages/DeckDetail';
@@ -17,17 +18,6 @@ const LoadingSpinner = () => (
     </div>
   </div>
 );
-
-// Protected Route - requires authentication
-const ProtectedRoute = ({ children }) => {
-  const { user, loading } = useAuth();
-  
-  if (loading) {
-    return <LoadingSpinner />;
-  }
-  
-  return user ? children : <Navigate to="/login" replace />;
-};
 
 // Public Route - redirects to dashboard if already authenticated
 const PublicRoute = ({ children }) => {

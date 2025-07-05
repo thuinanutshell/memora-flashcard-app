@@ -1,91 +1,122 @@
+import {
+  Badge,
+  Button,
+  Card,
+  Divider,
+  Flex,
+  Group,
+  ScrollArea,
+  Stack,
+  Text,
+  ThemeIcon,
+  Title,
+} from '@mantine/core';
 import { Brain, Check, X } from 'lucide-react';
-import Button from '../common/Button';
 
 const CardPreview = ({ generatedData, onAccept, onReject, loading }) => {
   const { cards, metadata } = generatedData;
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-lg font-semibold text-gray-900">
-            Generated Cards Preview
-          </h3>
-          <div className="flex items-center text-sm text-gray-500">
-            <Brain className="h-4 w-4 mr-1" />
-            <span>AI Generated</span>
-          </div>
-        </div>
-        
-        <div className="text-sm text-gray-600 space-x-4">
-          <span>Generated: {cards.length} cards</span>
-          <span>Difficulty: {metadata.difficulty}</span>
-          <span>Source: {metadata.generation_method}</span>
-          {metadata.source_filename && (
-            <span>File: {metadata.source_filename}</span>
-          )}
-        </div>
-      </div>
+    <Card withBorder shadow="sm" padding="lg" radius="md">
+      <Stack gap="lg">
+        {/* Header */}
+        <Group justify="space-between">
+          <Group>
+            <ThemeIcon size="lg" variant="light" color="purple">
+              <Brain size={24} />
+            </ThemeIcon>
+            <Stack gap={4}>
+              <Title order={3} size="h4">
+                Generated Cards Preview
+              </Title>
+              <Group gap="md" fz="sm" c="dimmed">
+                <Text>Generated: {cards.length} cards</Text>
+                <Text>Difficulty: {metadata.difficulty}</Text>
+                <Text>Source: {metadata.generation_method}</Text>
+                {metadata.source_filename && (
+                  <Text>File: {metadata.source_filename}</Text>
+                )}
+              </Group>
+            </Stack>
+          </Group>
+        </Group>
 
-      {/* Cards Grid */}
-      <div className="space-y-4 mb-6 max-h-96 overflow-y-auto">
-        {cards.map((card, index) => (
-          <div key={index} className="border border-gray-200 rounded-lg p-4">
-            <div className="flex items-start justify-between mb-3">
-              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                Card {index + 1}
-              </span>
-              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                {card.difficulty_level}
-              </span>
-            </div>
-            
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Question:
-                </label>
-                <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
-                  {card.question}
-                </p>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Answer:
-                </label>
-                <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
-                  {card.answer}
-                </p>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+        <Divider />
 
-      {/* Action Buttons */}
-      <div className="flex justify-end space-x-3">
-        <Button
-          variant="outline"
-          onClick={onReject}
-          disabled={loading}
-          className="flex items-center"
-        >
-          <X className="h-4 w-4 mr-2" />
-          Reject
-        </Button>
-        
-        <Button
-          onClick={onAccept}
-          loading={loading}
-          disabled={loading}
-          className="flex items-center"
-        >
-          <Check className="h-4 w-4 mr-2" />
-          {loading ? 'Saving Cards...' : `Accept & Save ${cards.length} Cards`}
-        </Button>
-      </div>
-    </div>
+        {/* Cards Grid */}
+        <ScrollArea h={400}>
+          <Stack gap="md">
+            {cards.map((card, index) => (
+              <Card key={index} withBorder padding="md" radius="sm">
+                <Stack gap="sm">
+                  <Group justify="space-between" align="center">
+                    <Badge variant="light" color="blue" size="sm">
+                      Card {index + 1}
+                    </Badge>
+                    <Badge 
+                      variant="light" 
+                      color={
+                        card.difficulty_level === 'easy' ? 'green' :
+                        card.difficulty_level === 'medium' ? 'yellow' : 'red'
+                      }
+                      size="sm"
+                    >
+                      {card.difficulty_level}
+                    </Badge>
+                  </Group>
+                  
+                  <Stack gap="xs">
+                    <div>
+                      <Text fw={500} size="sm" mb={4}>
+                        Question:
+                      </Text>
+                      <Card withBorder padding="xs" bg="gray.0">
+                        <Text size="sm">
+                          {card.question}
+                        </Text>
+                      </Card>
+                    </div>
+                    
+                    <div>
+                      <Text fw={500} size="sm" mb={4}>
+                        Answer:
+                      </Text>
+                      <Card withBorder padding="xs" bg="gray.0">
+                        <Text size="sm">
+                          {card.answer}
+                        </Text>
+                      </Card>
+                    </div>
+                  </Stack>
+                </Stack>
+              </Card>
+            ))}
+          </Stack>
+        </ScrollArea>
+
+        {/* Action Buttons */}
+        <Flex justify="flex-end" gap="md">
+          <Button
+            variant="light"
+            color="red"
+            leftSection={<X size={16} />}
+            onClick={onReject}
+            disabled={loading}
+          >
+            Reject
+          </Button>
+          
+          <Button
+            leftSection={<Check size={16} />}
+            onClick={onAccept}
+            loading={loading}
+            disabled={loading}
+          >
+            {loading ? 'Saving Cards...' : `Accept & Save ${cards.length} Cards`}
+          </Button>
+        </Flex>
+      </Stack>
+    </Card>
   );
 };
 
