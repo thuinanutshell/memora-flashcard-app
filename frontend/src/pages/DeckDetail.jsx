@@ -1,5 +1,6 @@
 import {
   Alert,
+  Badge,
   Box,
   Button,
   Card,
@@ -13,14 +14,16 @@ import {
   ThemeIcon,
   Title
 } from '@mantine/core';
-import { AlertCircle, BookOpen, Brain, FileText, Plus } from 'lucide-react';
+import { AlertCircle, BookOpen, Brain, Clock, FileText, Play, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import CardPreview from '../components/ai/CardPreview';
 import GenerateCardsForm from '../components/ai/GenerateCardsForm';
 import CardList from '../components/cards/CardList';
 import CreateCardModal from '../components/cards/CreateCardModal';
-import FlashCard from '../components/cards/FlashCard';
+import ReviewHistory from '../components/review/reviewHistory';
+import ReviewSession from '../components/review/reviewSession';
+import { useReview, useReviewQueue } from '../hooks/useReview';
 import { aiService } from '../services/aiService';
 import { cardService } from '../services/cardService';
 import { deckService } from '../services/deckService';
@@ -41,12 +44,18 @@ const DeckDetail = () => {
   // Manual Card Creation States
   const [showCreateCardModal, setShowCreateCardModal] = useState(false);
   
-  // Review Modal States
-  const [showReviewModal, setShowReviewModal] = useState(false);
-  const [reviewCard, setReviewCard] = useState(null);
+  // Review States
+  const [showReviewSession, setShowReviewSession] = useState(false);
+  const [showReviewHistory, setShowReviewHistory] = useState(false);
+  const [selectedCard, setSelectedCard] = useState(null);
+  
+  // Custom hooks
+  const { loadDeckQueue, queue: reviewQueue, queueLength } = useReviewQueue();
+  const review = useReview();
 
   useEffect(() => {
     loadDeck();
+    loadReviewQueue();
   }, [deckId]);
 
   const loadDeck = async () => {
@@ -64,6 +73,12 @@ const DeckDetail = () => {
       setError('Failed to load deck');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadReviewQueue = async () => {
+    if (deckId) {
+      await loadDeckQueue(deckId);
     }
   };
 
@@ -96,7 +111,7 @@ const DeckDetail = () => {
       const result = await aiService.acceptCards(deckId, generatedCards.cards);
       if (result.success) {
         setGeneratedCards(null);
-        await loadDeck(); // Reload deck to show new cards
+        await Promise.all([loadDeck(), loadReviewQueue()]);
       } else {
         setError(result.error);
       }
@@ -115,7 +130,7 @@ const DeckDetail = () => {
   const handleCreateCard = async (cardData) => {
     const result = await cardService.createCard(deckId, cardData);
     if (result.success) {
-      await loadDeck(); // Reload deck to show new card
+      await Promise.all([loadDeck(), loadReviewQueue()]);
       return { success: true };
     } else {
       return { success: false, error: result.error };
@@ -128,36 +143,50 @@ const DeckDetail = () => {
   };
 
   const handleReviewCard = (card) => {
-    setReviewCard(card);
-    setShowReviewModal(true);
+    // Start a single card review session
+    setSelectedCard(card);
+    review.startSession();
+    setShowReviewSession(true);
   };
 
-  const handleCloseReview = () => {
-    setShowReviewModal(false);
-    setReviewCard(null);
-  };
-
-  const handleReviewNext = (difficulty) => {
-    // TODO: Update card review status based on difficulty
-    console.log('Review completed with difficulty:', difficulty);
-    
-    // For now, just close the modal
-    // In a real implementation, you would:
-    // 1. Update the card's review status
-    // 2. Update spaced repetition schedule
-    // 3. Possibly show the next card due for review
-    handleCloseReview();
+  const handleShowReviewHistory = (card) => {
+    setSelectedCard(card);
+    setShowReviewHistory(true);
   };
 
   const handleDeleteCard = async (card) => {
     if (window.confirm(`Are you sure you want to delete this card: "${card.question}"?`)) {
       const result = await cardService.deleteCard(card.id);
       if (result.success) {
-        await loadDeck(); // Reload deck to remove deleted card
+        await Promise.all([loadDeck(), loadReviewQueue()]);
       } else {
         setError(result.error);
       }
     }
+  };
+
+  const handleStartReviewSession = () => {
+    if (queueLength > 0) {
+      review.startSession();
+      setShowReviewSession(true);
+    }
+  };
+
+  const handleReviewComplete = (sessionStats) => {
+    setShowReviewSession(false);
+    review.endSession();
+    
+    // Refresh data after review session
+    Promise.all([loadDeck(), loadReviewQueue()]);
+    
+    // Show completion message or navigate
+    console.log('Review session completed:', sessionStats);
+  };
+
+  const handleReviewExit = () => {
+    setShowReviewSession(false);
+    setSelectedCard(null);
+    review.resetSession();
   };
 
   if (loading) {
@@ -193,6 +222,7 @@ const DeckDetail = () => {
 
   const cardCount = deck?.cards?.length || 0;
   const masteredCount = deck?.cards?.filter(card => card.is_fully_reviewed).length || 0;
+  const reviewableCount = queueLength;
 
   return (
     <Box>
@@ -230,19 +260,37 @@ const DeckDetail = () => {
         
         {/* Deck Stats */}
         <Group gap="lg" c="dimmed" fz="sm">
-          <Text>
-            <Text component="span" fw={500} c="dark">
-              {cardCount}
-            </Text>{' '}
-            {cardCount === 1 ? 'card' : 'cards'}
-          </Text>
+          <Group gap="xs">
+            <FileText size={16} />
+            <Text>
+              <Text component="span" fw={500} c="dark">
+                {cardCount}
+              </Text>{' '}
+              {cardCount === 1 ? 'card' : 'cards'}
+            </Text>
+          </Group>
           
-          <Text>
-            <Text component="span" fw={500} c="dark">
-              {masteredCount}
-            </Text>{' '}
-            mastered
-          </Text>
+          <Group gap="xs">
+            <BookOpen size={16} />
+            <Text>
+              <Text component="span" fw={500} c="dark">
+                {masteredCount}
+              </Text>{' '}
+              mastered
+            </Text>
+          </Group>
+
+          {reviewableCount > 0 && (
+            <Group gap="xs">
+              <Clock size={16} />
+              <Text>
+                <Text component="span" fw={500} c="orange">
+                  {reviewableCount}
+                </Text>{' '}
+                due for review
+              </Text>
+            </Group>
+          )}
         </Group>
       </Box>
 
@@ -250,11 +298,24 @@ const DeckDetail = () => {
 
       {/* Action Buttons */}
       <Group mb="xl">
+        {/* Review Session Button */}
+        {reviewableCount > 0 && (
+          <Button
+            leftSection={<Play size={16} />}
+            onClick={handleStartReviewSession}
+            color="blue"
+            variant="filled"
+            size="md"
+          >
+            Start Review ({reviewableCount} cards)
+          </Button>
+        )}
+
         <Button
           leftSection={<Brain size={16} />}
           onClick={() => setShowGenerateForm(true)}
           color="purple"
-          variant="filled"
+          variant={reviewableCount > 0 ? "light" : "filled"}
         >
           Generate Cards
         </Button>
@@ -267,6 +328,38 @@ const DeckDetail = () => {
           Add Card Manually
         </Button>
       </Group>
+
+      {/* Review Status Card */}
+      {cardCount > 0 && (
+        <Card withBorder mb="xl" p="md">
+          <Group justify="space-between">
+            <Stack gap={4}>
+              <Text fw={500}>Review Status</Text>
+              <Group gap="lg">
+                <Group gap="xs">
+                  <Badge variant="light" color="green">
+                    {masteredCount} Mastered
+                  </Badge>
+                  <Badge variant="light" color="blue">
+                    {cardCount - masteredCount - reviewableCount} Learning
+                  </Badge>
+                  {reviewableCount > 0 && (
+                    <Badge variant="filled" color="orange">
+                      {reviewableCount} Due Now
+                    </Badge>
+                  )}
+                </Group>
+              </Group>
+            </Stack>
+            
+            {reviewableCount === 0 && cardCount > 0 && (
+              <Group gap="xs" c="green">
+                <Text size="sm" fw={500}>All caught up!</Text>
+              </Group>
+            )}
+          </Group>
+        </Card>
+      )}
 
       <Stack gap="xl">
         {/* AI Generation Form */}
@@ -290,68 +383,59 @@ const DeckDetail = () => {
         )}
 
         {/* Existing Cards */}
-        <Card withBorder shadow="sm" padding="lg" radius="md">
-          <Stack gap="md">
-            <Group justify="space-between" align="center">
-              <Title order={3} size="h4">
-                Cards in this Deck
-              </Title>
-              <Text c="dimmed" size="sm">
-                {cardCount} {cardCount === 1 ? 'card' : 'cards'}
-              </Text>
-            </Group>
-            
-            {cardCount === 0 ? (
-              <Card
-                withBorder
-                padding="xl"
-                radius="md"
-                style={{ borderStyle: 'dashed' }}
-              >
-                <Center>
-                  <Stack align="center" gap="md">
-                    <ThemeIcon size={60} variant="light" color="gray">
-                      <FileText size={30} />
-                    </ThemeIcon>
-                    
-                    <Stack align="center" gap="xs">
-                      <Title order={4} c="dimmed">
-                        No cards yet
-                      </Title>
-                      <Text size="sm" c="dimmed" ta="center">
-                        Generate or create your first card to get started
-                      </Text>
-                    </Stack>
-                    
-                    <Group>
-                      <Button 
-                        leftSection={<Brain size={16} />}
-                        onClick={() => setShowGenerateForm(true)}
-                        color="purple"
-                      >
-                        Generate with AI
-                      </Button>
-                      <Button 
-                        leftSection={<Plus size={16} />}
-                        onClick={() => setShowCreateCardModal(true)}
-                        variant="light"
-                      >
-                        Create Manually
-                      </Button>
-                    </Group>
+        <Stack gap="md">
+          
+          {cardCount === 0 ? (
+            <Card
+              withBorder
+              padding="xl"
+              radius="md"
+              style={{ borderStyle: 'dashed' }}
+            >
+              <Center>
+                <Stack align="center" gap="md">
+                  <ThemeIcon size={60} variant="light" color="gray">
+                    <FileText size={30} />
+                  </ThemeIcon>
+                  
+                  <Stack align="center" gap="xs">
+                    <Title order={4} c="dimmed">
+                      No cards yet
+                    </Title>
+                    <Text size="sm" c="dimmed" ta="center">
+                      Generate or create your first card to get started
+                    </Text>
                   </Stack>
-                </Center>
-              </Card>
-            ) : (
-              <CardList 
-                cards={deck.cards}
-                onEdit={handleEditCard}
-                onDelete={handleDeleteCard}
-                onReview={handleReviewCard}
-              />
-            )}
-          </Stack>
-        </Card>
+                  
+                  <Group>
+                    <Button 
+                      leftSection={<Brain size={16} />}
+                      onClick={() => setShowGenerateForm(true)}
+                      color="purple"
+                    >
+                      Generate with AI
+                    </Button>
+                    <Button 
+                      leftSection={<Plus size={16} />}
+                      onClick={() => setShowCreateCardModal(true)}
+                      variant="light"
+                    >
+                      Create Manually
+                    </Button>
+                  </Group>
+                </Stack>
+              </Center>
+            </Card>
+          ) : (
+            <CardList 
+              cards={deck.cards}
+              onEdit={handleEditCard}
+              onDelete={handleDeleteCard}
+              onReview={handleReviewCard}
+              onShowHistory={handleShowReviewHistory}
+            />
+          )}
+        </Stack>
       </Stack>
 
       {/* Create Card Modal */}
@@ -364,21 +448,37 @@ const DeckDetail = () => {
         />
       )}
 
-      {/* Review Modal */}
-      {showReviewModal && reviewCard && (
+      {/* Review Session Modal */}
+      {showReviewSession && (
         <Modal
-          opened={showReviewModal}
-          onClose={handleCloseReview}
-          title={`Review: ${deck?.name}`}
-          size="lg"
+          opened={showReviewSession}
+          onClose={handleReviewExit}
+          title="Review Session"
+          size="xl"
           centered
+          fullScreen
         >
-          <FlashCard
-            card={reviewCard}
-            onNext={handleReviewNext}
-            onMarkDifficulty={handleReviewNext}
+          <ReviewSession
+            deckId={deckId}
+            deckName={deck?.name}
+            initialCards={selectedCard ? [selectedCard] : reviewQueue}
+            onComplete={handleReviewComplete}
+            onExit={handleReviewExit}
           />
         </Modal>
+      )}
+
+      {/* Review History Modal */}
+      {showReviewHistory && selectedCard && (
+        <ReviewHistory
+          cardId={selectedCard.id}
+          cardInfo={selectedCard}
+          opened={showReviewHistory}
+          onClose={() => {
+            setShowReviewHistory(false);
+            setSelectedCard(null);
+          }}
+        />
       )}
     </Box>
   );

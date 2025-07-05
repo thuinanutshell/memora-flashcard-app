@@ -7,19 +7,25 @@ import {
     Progress,
     Stack,
     Text,
+    Textarea,
     Title,
 } from '@mantine/core';
-import { CheckCircle, RotateCcw, X } from 'lucide-react';
+import { CheckCircle, RotateCcw, Send, X } from 'lucide-react';
 import { useState } from 'react';
+import { reviewService } from '../../services/reviewService';
 
 const ReviewCard = ({ 
   cards = [], 
   currentIndex = 0, 
   onComplete, 
-  onCardReview 
+  onCardReview,
+  deckName = ''
 }) => {
   const [showAnswer, setShowAnswer] = useState(false);
+  const [showAnswerInput, setShowAnswerInput] = useState(false);
   const [userAnswer, setUserAnswer] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [reviewResult, setReviewResult] = useState(null);
 
   const currentCard = cards[currentIndex];
   const progressPercentage = cards.length > 0 ? ((currentIndex + 1) / cards.length) * 100 : 0;
@@ -28,22 +34,77 @@ const ReviewCard = ({
     setShowAnswer(true);
   };
 
-  const handleNextCard = (isCorrect) => {
-    onCardReview?.(currentCard, isCorrect);
+  const handleStartAnswering = () => {
+    setShowAnswerInput(true);
+  };
+
+  const handleSubmitAnswer = async () => {
+    if (!userAnswer.trim() || !currentCard) return;
+
+    setSubmitting(true);
     
+    try {
+      const result = await reviewService.submitReview(currentCard.id, userAnswer);
+      if (result.success) {
+        setReviewResult(result.data);
+        
+        // Call the parent callback with review data
+        onCardReview?.(currentCard, {
+          score: result.data.score,
+          userAnswer: userAnswer,
+          isCorrect: result.data.score >= 70
+        });
+      }
+    } catch (error) {
+      console.error('Failed to submit review:', error);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleNextCard = () => {
     if (currentIndex < cards.length - 1) {
-      // Move to next card
+      // Reset states for next card
       setShowAnswer(false);
+      setShowAnswerInput(false);
       setUserAnswer('');
+      setReviewResult(null);
+      
+      // Move to next card (handled by parent)
+      onCardReview?.(currentCard, {
+        score: reviewResult?.score || 0,
+        userAnswer: userAnswer,
+        isCorrect: (reviewResult?.score || 0) >= 70,
+        moveToNext: true
+      });
     } else {
-      // Review session complete
-      onComplete?.();
+      // Session complete
+      onComplete?.({
+        totalCards: cards.length,
+        completedCards: currentIndex + 1
+      });
     }
   };
 
   const handleRestart = () => {
     setShowAnswer(false);
+    setShowAnswerInput(false);
     setUserAnswer('');
+    setReviewResult(null);
+  };
+
+  const getScoreColor = (score) => {
+    if (score >= 90) return 'green';
+    if (score >= 70) return 'blue';
+    if (score >= 50) return 'yellow';
+    return 'red';
+  };
+
+  const getScoreLabel = (score) => {
+    if (score >= 90) return 'Excellent';
+    if (score >= 70) return 'Good';
+    if (score >= 50) return 'Fair';
+    return 'Needs Review';
   };
 
   if (!currentCard) {
@@ -69,7 +130,7 @@ const ReviewCard = ({
       <Stack gap="xs">
         <Group justify="space-between">
           <Text size="sm" c="dimmed">
-            Review Progress
+            {deckName && `${deckName} - `}Review Progress
           </Text>
           <Text size="sm" c="dimmed">
             {currentIndex + 1} of {cards.length}
@@ -106,8 +167,68 @@ const ReviewCard = ({
         </Stack>
       </Card>
 
+      {/* Answer Input Section */}
+      {showAnswerInput && !reviewResult && (
+        <Card withBorder shadow="md" padding="lg" radius="md" bg="gray.0">
+          <Stack gap="md">
+            <Text fw={500} c="dimmed" size="sm">
+              Your Answer:
+            </Text>
+            <Textarea
+              placeholder="Type your answer here..."
+              value={userAnswer}
+              onChange={(e) => setUserAnswer(e.target.value)}
+              rows={4}
+              autoFocus
+            />
+            <Group justify="flex-end">
+              <Button
+                variant="light"
+                onClick={() => setShowAnswerInput(false)}
+                leftSection={<X size={16} />}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSubmitAnswer}
+                loading={submitting}
+                disabled={!userAnswer.trim()}
+                leftSection={<Send size={16} />}
+              >
+                Submit Answer
+              </Button>
+            </Group>
+          </Stack>
+        </Card>
+      )}
+
+      {/* Score Display */}
+      {reviewResult && (
+        <Card withBorder shadow="md" padding="lg" radius="md" bg={`${getScoreColor(reviewResult.score)}.0`}>
+          <Stack align="center" gap="md">
+            <CheckCircle size={48} color={`var(--mantine-color-${getScoreColor(reviewResult.score)}-6)`} />
+            
+            <Stack align="center" gap="xs">
+              <Title order={3}>
+                {Math.round(reviewResult.score)}% Match
+              </Title>
+              <Badge color={getScoreColor(reviewResult.score)} size="lg">
+                {getScoreLabel(reviewResult.score)}
+              </Badge>
+            </Stack>
+
+            <Progress 
+              value={reviewResult.score} 
+              size="lg" 
+              color={getScoreColor(reviewResult.score)}
+              style={{ width: '100%' }}
+            />
+          </Stack>
+        </Card>
+      )}
+
       {/* Answer Section */}
-      {showAnswer ? (
+      {showAnswer && (
         <Card withBorder shadow="md" padding="xl" radius="md" bg="blue.0">
           <Stack gap="md">
             <Text fw={500} c="dimmed" size="sm">
@@ -118,46 +239,67 @@ const ReviewCard = ({
             </Text>
           </Stack>
         </Card>
-      ) : (
+      )}
+
+      {/* Action Buttons */}
+      {!showAnswerInput && !reviewResult && (
         <Center>
-          <Button 
+          {!showAnswer ? (
+            <Group>
+              <Button 
+                size="lg"
+                onClick={handleShowAnswer}
+                leftSection={<RotateCcw size={18} />}
+                variant="light"
+              >
+                Show Answer
+              </Button>
+              <Button
+                size="lg"
+                onClick={handleStartAnswering}
+                color="blue"
+              >
+                Test Yourself
+              </Button>
+            </Group>
+          ) : (
+            <Button
+              size="lg"
+              onClick={handleStartAnswering}
+              color="green"
+            >
+              Test Your Knowledge
+            </Button>
+          )}
+        </Center>
+      )}
+
+      {/* Continue Button */}
+      {reviewResult && (
+        <Center>
+          <Button
             size="lg"
-            onClick={handleShowAnswer}
-            leftSection={<RotateCcw size={18} />}
+            onClick={handleNextCard}
+            color="green"
+            leftSection={<CheckCircle size={18} />}
           >
-            Reveal Answer
+            {currentIndex < cards.length - 1 ? 'Next Card' : 'Complete Session'}
           </Button>
         </Center>
       )}
 
-      {/* Review Buttons */}
-      {showAnswer && (
-        <Group justify="center" gap="md">
-          <Button
-            color="red"
-            variant="light"
-            size="lg"
-            leftSection={<X size={18} />}
-            onClick={() => handleNextCard(false)}
-          >
-            Incorrect
-          </Button>
-          <Button
-            color="green"
-            variant="light"
-            size="lg"
-            leftSection={<CheckCircle size={18} />}
-            onClick={() => handleNextCard(true)}
-          >
-            Correct
-          </Button>
-        </Group>
-      )}
-
-      {/* Session Info */}
+      {/* Instructions */}
       <Center>
-        <Text size="sm" c="dimmed">
-          Be honest with yourself - did you know the answer?
+        <Text size="sm" c="dimmed" ta="center" maw={500}>
+          {!showAnswerInput && !reviewResult && !showAnswer && 
+            "Choose to see the answer first or test yourself directly"
+          }
+          {showAnswer && !showAnswerInput && !reviewResult &&
+            "Ready to test your knowledge? Your answer will be scored using AI"
+          }
+          {reviewResult &&
+            "Great job! Continue to the next card when you're ready"
+          }
         </Text>
       </Center>
     </Stack>

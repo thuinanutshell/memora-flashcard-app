@@ -1,14 +1,9 @@
 import {
   Box,
-  Button,
   Container,
-  Group,
-  Paper,
-  Stack,
-  Text,
-  Title
+  Stack
 } from '@mantine/core';
-import { BarChart3, BookOpen, Brain, Folder, LogOut } from 'lucide-react';
+import { BarChart3, BookOpen, Brain, Folder } from 'lucide-react';
 import FolderList from '../components/folders/FolderList';
 import { useAuth } from '../context/AuthContext';
 

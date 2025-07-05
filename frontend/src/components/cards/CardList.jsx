@@ -9,11 +9,12 @@ import {
     Stack,
     Text,
     ThemeIcon,
+    Tooltip,
 } from '@mantine/core';
-import { CheckCircle, Clock, Edit, Eye, EyeOff, FileText, Play, Trash2 } from 'lucide-react';
+import { CheckCircle, Clock, Edit, Eye, EyeOff, FileText, History, Play, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
-const CardList = ({ cards, onEdit, onDelete, onReview }) => {
+const CardList = ({ cards, onEdit, onDelete, onReview, onShowHistory }) => {
   const [expandedCards, setExpandedCards] = useState(new Set());
 
   const toggleCardExpansion = (cardId) => {
@@ -24,6 +25,45 @@ const CardList = ({ cards, onEdit, onDelete, onReview }) => {
       newExpanded.add(cardId);
     }
     setExpandedCards(newExpanded);
+  };
+
+  const isCardDueForReview = (card) => {
+    if (card.is_fully_reviewed) return false;
+    if (!card.next_review_at) return true; // Never reviewed
+    return new Date(card.next_review_at) <= new Date();
+  };
+
+  const getCardStatus = (card) => {
+    if (card.is_fully_reviewed) {
+      return { label: 'Mastered', color: 'green', icon: CheckCircle };
+    }
+    
+    if (isCardDueForReview(card)) {
+      return { label: 'Due for Review', color: 'orange', icon: Clock };
+    }
+    
+    return { 
+      label: `Learning (${card.review_count || 0}/3)`, 
+      color: 'blue', 
+      icon: Clock 
+    };
+  };
+
+  const formatNextReview = (nextReviewAt) => {
+    if (!nextReviewAt) return 'Ready now';
+    
+    const date = new Date(nextReviewAt);
+    const now = new Date();
+    
+    if (date <= now) return 'Overdue';
+    
+    const diffMs = date - now;
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    
+    if (diffDays > 0) return `Due in ${diffDays}d`;
+    if (diffHours > 0) return `Due in ${diffHours}h`;
+    return 'Due soon';
   };
 
   if (!cards || cards.length === 0) {
@@ -45,13 +85,25 @@ const CardList = ({ cards, onEdit, onDelete, onReview }) => {
     <Stack gap="md">
       {cards.map((card, index) => {
         const isExpanded = expandedCards.has(card.id);
+        const status = getCardStatus(card);
+        const StatusIcon = status.icon;
+        const isDue = isCardDueForReview(card);
         
         return (
-          <Card key={card.id} withBorder padding="md" radius="md">
+          <Card 
+            key={card.id} 
+            withBorder 
+            padding="md" 
+            radius="md"
+            style={{
+              borderColor: isDue ? 'var(--mantine-color-orange-3)' : undefined,
+              backgroundColor: isDue ? 'var(--mantine-color-orange-0)' : undefined
+            }}
+          >
             <Stack gap="sm">
               {/* Card Header */}
               <Group justify="space-between" align="flex-start">
-                <Group gap="xs">
+                <Group gap="xs" wrap="wrap">
                   <Badge variant="light" color="gray" size="sm">
                     Card {index + 1}
                   </Badge>
@@ -70,37 +122,46 @@ const CardList = ({ cards, onEdit, onDelete, onReview }) => {
                   <Badge 
                     variant="light" 
                     size="sm"
-                    color={card.is_fully_reviewed ? 'green' : 'blue'}
-                    leftSection={
-                      card.is_fully_reviewed ? 
-                        <CheckCircle size={12} /> : 
-                        <Clock size={12} />
-                    }
+                    color={status.color}
+                    leftSection={<StatusIcon size={12} />}
                   >
-                    {card.is_fully_reviewed ? 
-                      'Mastered' : 
-                      `Learning (${card.review_count || 0}/3)`
-                    }
+                    {status.label}
                   </Badge>
+
+                  {/* Review timing info */}
+                  {!card.is_fully_reviewed && (
+                    <Badge 
+                      variant="dot" 
+                      size="sm"
+                      color={isDue ? 'orange' : 'gray'}
+                    >
+                      {formatNextReview(card.next_review_at)}
+                    </Badge>
+                  )}
                 </Group>
                 
                 <Group gap="xs">
-                  <ActionIcon
-                    variant="subtle"
-                    color="gray"
-                    size="sm"
-                    onClick={() => onEdit?.(card)}
-                  >
-                    <Edit size={14} />
-                  </ActionIcon>
-                  <ActionIcon
-                    variant="subtle"
-                    color="red"
-                    size="sm"
-                    onClick={() => onDelete?.(card)}
-                  >
-                    <Trash2 size={14} />
-                  </ActionIcon>
+                  <Tooltip label="Edit card">
+                    <ActionIcon
+                      variant="subtle"
+                      color="gray"
+                      size="sm"
+                      onClick={() => onEdit?.(card)}
+                    >
+                      <Edit size={14} />
+                    </ActionIcon>
+                  </Tooltip>
+
+                  <Tooltip label="Delete card">
+                    <ActionIcon
+                      variant="subtle"
+                      color="red"
+                      size="sm"
+                      onClick={() => onDelete?.(card)}
+                    >
+                      <Trash2 size={14} />
+                    </ActionIcon>
+                  </Tooltip>
                 </Group>
               </Group>
               
@@ -149,16 +210,41 @@ const CardList = ({ cards, onEdit, onDelete, onReview }) => {
                     leftSection={<Play size={14} />}
                     onClick={() => onReview?.(card)}
                   >
-                    Review
+                    Review Card
                   </Button>
+
+                  <Button
+                    variant="subtle"
+                    color="gray"
+                    size="xs"
+                    leftSection={<History size={14} />}
+                    onClick={() => onShowHistory?.(card)}
+                  >
+                    History
+                  </Button>
+
+                  {/* Priority indicator if due */}
+                  {isDue && (
+                    <Badge variant="filled" color="orange" size="sm">
+                      Due for Review
+                    </Badge>
+                  )}
                 </Group>
 
                 {/* Card Stats */}
-                {card.last_reviewed_at && (
-                  <Text size="xs" c="dimmed">
-                    Last reviewed: {new Date(card.last_reviewed_at).toLocaleDateString()}
-                  </Text>
-                )}
+                <Group gap="md">
+                  {card.last_reviewed_at && (
+                    <Text size="xs" c="dimmed">
+                      Last reviewed: {new Date(card.last_reviewed_at).toLocaleDateString()}
+                    </Text>
+                  )}
+                  
+                  {card.review_count > 0 && (
+                    <Text size="xs" c="dimmed">
+                      Reviewed {card.review_count} time{card.review_count !== 1 ? 's' : ''}
+                    </Text>
+                  )}
+                </Group>
               </Group>
             </Stack>
           </Card>

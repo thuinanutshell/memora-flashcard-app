@@ -3,6 +3,8 @@ import '@mantine/core/styles.css';
 import { Navigate, Route, BrowserRouter as Router, Routes } from 'react-router-dom';
 import ProtectedRoute from './components/common/ProtectedRoute';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import AIChatPage from './pages/AIChatPage';
+import AnalyticsPage from './pages/AnalyticsPage';
 import Dashboard from './pages/Dashboard';
 import DeckDetail from './pages/DeckDetail';
 import FolderDetail from './pages/FolderDetail';
@@ -62,6 +64,22 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/analytics" 
+          element={
+            <ProtectedRoute>
+              <AnalyticsPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/ai-chat" 
+          element={
+            <ProtectedRoute>
+              <AIChatPage />
             </ProtectedRoute>
           } 
         />
