@@ -23,6 +23,7 @@ https://github.com/user-attachments/assets/42b473c1-ad0c-4861-9086-0ecb6d2a694a
    - [Design](#design)
    - [Structure](#structure)
    - [Components](#components)
+5. [Setup](#setup)
 
 # Key Features
 1. CRUD operations for folders, study decks, and flashcards
@@ -154,4 +155,41 @@ Backend and frontend are connected properly (authentication and CRUD operations 
 
 ## Key Takeaways
 - Standardizing the format and structure of the backend response (success, failure, duplicated, etc.) is tremendously helpful for integrating with the frontend, especially when rendering the data like lists. I encountered several bugs when fetching the data from the backend to the frontend because the structure of the response message is either nested or inconsistent.
-## Next Steps
+## Setup
+1. Create a virtual environment in the root folder and activate it
+```
+python3 -m venv .venv
+. .venv/bin/activate
+```
+2. Configure your `.env.development` file in the root folder to store all secret keys and variables for development
+```
+FLASK_ENV=development
+DEV_DATABASE_URI=sqlite:///development.db
+DEV_JWT_SECRET_KEY=dev-secret-change-in-production
+DEV_REDIS_URL=redis://localhost:6379/1
+GEMINI_API_KEY={your-gemini-secret-key}
+```
+3. Install all necessary packages
+```
+pip install -r requirements.txt
+```
+4. Run the backend
+```
+cd backend
+export FLASK_ENV=development
+python3 run.py
+```
+5. Run the frontend
+```
+cd frontend
+npm install
+npm run dev
+```
+
+
+
+
+
+
+
+
